@@ -1,0 +1,15 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "../../out-tsc/lib",
+		"declaration": true,
+		"declarationMap": true,
+		"inlineSources": true,
+		"types": [],
+		"paths": {
+			"ng-hub-ui-forms": ["../../dist/forms"],
+			"ng-hub-ui-utils": ["../../dist/utils"]
+		}
+	},
+	"exclude": ["**/*.spec.ts"]
+}

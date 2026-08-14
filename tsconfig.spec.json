@@ -1,0 +1,12 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "../../out-tsc/spec",
+		"types": ["vitest/globals", "node"],
+		"paths": {
+			"ng-hub-ui-forms": ["../../projects/forms/src/public-api.ts"],
+			"ng-hub-ui-utils": ["../../projects/utils/src/public-api.ts"]
+		}
+	},
+	"include": ["src/**/*.spec.ts", "src/**/*.d.ts"]
+}

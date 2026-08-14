@@ -1,0 +1,28 @@
+/**
+ * Applies a coherent signature-field theme without coupling consumers to its DOM.
+ */
+@mixin hub-signature-theme(
+	$background: null,
+	$color: null,
+	$border-color: null,
+	$border-radius: null,
+	$focus-border-color: null
+) {
+	:where(.hub-signature) {
+		@if $background != null {
+			--hub-signature-bg: #{$background};
+		}
+		@if $color != null {
+			--hub-signature-color: #{$color};
+		}
+		@if $border-color != null {
+			--hub-signature-border-color: #{$border-color};
+		}
+		@if $border-radius != null {
+			--hub-signature-border-radius: #{$border-radius};
+		}
+		@if $focus-border-color != null {
+			--hub-signature-focus-border-color: #{$focus-border-color};
+		}
+	}
+}

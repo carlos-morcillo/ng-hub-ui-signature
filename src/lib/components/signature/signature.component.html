@@ -1,0 +1,60 @@
+<div
+	class="hub-field hub-signature"
+	[class.hub-signature--readonly]="readonly()"
+	[class.hub-signature--disabled]="disabled()"
+	[class.hub-signature--invalid]="isInvalid"
+	[class.hub-signature--valid]="showsValid"
+>
+	@if (label() || required()) {
+		<label [for]="id" class="hub-signature__label">
+			{{ label() }}
+			@if (required()) {
+				<span class="hub-signature__required" aria-hidden="true">*</span>
+			}
+		</label>
+	}
+
+	<canvas
+		#canvas
+		[id]="id"
+		class="hub-signature__canvas"
+		tabindex="0"
+		[attr.aria-label]="ariaLabel()"
+		[attr.aria-required]="required() ? 'true' : null"
+		[attr.aria-invalid]="isInvalid"
+		[attr.aria-readonly]="readonly() ? 'true' : null"
+		[attr.aria-disabled]="disabled() ? 'true' : null"
+		(pointerdown)="startStroke($event)"
+		(pointermove)="moveStroke($event)"
+		(pointerup)="finishStroke($event)"
+		(pointercancel)="finishStroke($event)"
+	></canvas>
+
+	@if (controls()) {
+		<div class="hub-signature__actions">
+			<button class="hub-signature__action" type="button" [disabled]="disabled() || readonly()" (click)="clear()">
+				{{ actionLabels().clear }}
+			</button>
+			<button class="hub-signature__action" type="button" [disabled]="disabled() || readonly()" (click)="undo()">
+				{{ actionLabels().undo }}
+			</button>
+			<button class="hub-signature__action" type="button" [disabled]="disabled() || readonly()" (click)="redo()">
+				{{ actionLabels().redo }}
+			</button>
+		</div>
+	}
+
+	@if (formText()) {
+		<div class="hub-field__form-text" [class.hub-field__form-text--disabled]="disabled()">{{ formText() }}</div>
+	}
+
+	@if (isInvalid) {
+		<div class="hub-field__feedback" role="alert">
+			<ul>
+				@for (error of errors | keyvalue; track error.key) {
+					<li><span class="hub-field__feedback-text">{{ getInvalidFeedbackTemplate(error.key, error.value) }}</span></li>
+				}
+			</ul>
+		</div>
+	}
+</div>

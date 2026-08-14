@@ -1,0 +1,68 @@
+:where(.hub-signature) {
+	--hub-signature-bg: var(--hub-field-bg, var(--hub-sys-surface, #fff));
+	--hub-signature-color: var(--hub-field-color, var(--hub-sys-text-primary, #212529));
+	--hub-signature-border-color: var(--hub-field-border-color, var(--hub-sys-border, #ced4da));
+	--hub-signature-border-width: var(--hub-field-border-width, 1px);
+	--hub-signature-border-radius: var(--hub-field-border-radius, var(--hub-ref-radius-md, 0.375rem));
+	--hub-signature-focus-border-color: var(--hub-field-focus-border-color, var(--hub-sys-color-primary, #0d6efd));
+	--hub-signature-focus-shadow: var(--hub-field-focus-shadow, 0 0 0 0.25rem rgb(13 110 253 / 25%));
+	--hub-signature-label-color: var(--hub-field-label-color, var(--hub-sys-text-primary, #212529));
+	--hub-signature-label-font-size: var(--hub-field-label-font-size, var(--hub-ref-font-size-sm, 0.875rem));
+	--hub-signature-font-size: var(--hub-field-font-size, 1rem);
+	--hub-signature-actions-gap: var(--hub-ref-space-2, 0.5rem);
+}
+
+.hub-signature {
+	display: grid;
+	gap: var(--hub-ref-space-2, 0.5rem);
+	color: var(--hub-signature-color);
+	font-size: var(--hub-signature-font-size);
+}
+
+.hub-signature__label {
+	color: var(--hub-signature-label-color);
+	font-size: var(--hub-signature-label-font-size);
+	font-weight: var(--hub-field-label-font-weight, var(--hub-ref-font-weight-medium, 500));
+}
+
+.hub-signature__required {
+	color: var(--hub-sys-color-danger, #dc3545);
+}
+
+.hub-signature__canvas {
+	display: block;
+	inline-size: 100%;
+	touch-action: none;
+	background: var(--hub-signature-bg);
+	border: var(--hub-signature-border-width) solid var(--hub-signature-border-color);
+	border-radius: var(--hub-signature-border-radius);
+	cursor: crosshair;
+	outline: none;
+}
+
+.hub-signature__canvas:focus-visible {
+	border-color: var(--hub-signature-focus-border-color);
+	box-shadow: var(--hub-signature-focus-shadow);
+}
+
+.hub-signature--readonly .hub-signature__canvas,
+.hub-signature--disabled .hub-signature__canvas {
+	cursor: default;
+	opacity: var(--hub-field-disabled-opacity, 0.65);
+}
+
+.hub-signature__actions {
+	display: flex;
+	gap: var(--hub-signature-actions-gap);
+}
+
+.hub-signature__action {
+	appearance: none;
+	padding: var(--hub-ref-space-1, 0.25rem) var(--hub-ref-space-2, 0.5rem);
+	color: var(--hub-signature-color);
+	font: inherit;
+	background: transparent;
+	border: 1px solid var(--hub-signature-border-color);
+	border-radius: var(--hub-signature-border-radius);
+	cursor: pointer;
+}
