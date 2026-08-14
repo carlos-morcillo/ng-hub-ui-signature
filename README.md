@@ -54,7 +54,7 @@ Add `HUBUI.SIGNATURE.ACTION.CLEAR`, `HUBUI.SIGNATURE.ACTION.UNDO` and `HUBUI.SIG
 
 ## Theming
 
-Every field surface is customizable with `--hub-signature-*` variables. The defaults inherit the `--hub-field-*` family from `ng-hub-ui-forms` so labels, borders, radius and typography match the rest of a form.
+Every field surface is customizable with `--hub-signature-*` variables. The defaults inherit the field contract of `ng-hub-ui-forms` — the drawing surface reads the `--hub-input-*` control tokens, the label reads `--hub-label-*` and the disabled state reads `--hub-form-disabled-opacity` — so theming a form themes its signature field too, with no extra rules.
 
 ```scss
 @use 'ng-hub-ui-signature/styles' as hub;

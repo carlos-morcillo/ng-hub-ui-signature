@@ -53,3 +53,15 @@ Añade `HUBUI.SIGNATURE.ACTION.CLEAR`, `HUBUI.SIGNATURE.ACTION.UNDO` y `HUBUI.SI
 // Una única excepción puede sobrescribir una etiqueta global.
 <hub-signature [labels]="{ clear: 'Borrar definitivamente' }" />
 ```
+
+## Personalización
+
+Cada superficie del campo se personaliza con variables `--hub-signature-*`. Los valores por defecto heredan el contrato de campo de `ng-hub-ui-forms` — la superficie de dibujo lee los tokens de control `--hub-input-*`, la etiqueta lee `--hub-label-*` y el estado deshabilitado lee `--hub-form-disabled-opacity` —, de modo que dar tema a un formulario se lo da también a su campo de firma, sin reglas adicionales.
+
+```scss
+@use 'ng-hub-ui-signature/styles' as hub;
+
+.contract-form {
+	@include hub.hub-signature-theme($border-radius: 0.75rem);
+}
+```
