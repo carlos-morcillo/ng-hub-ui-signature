@@ -1,6 +1,40 @@
-/**
- * Applies a coherent signature-field theme without coupling consumers to its DOM.
- */
+// ─────────────────────────────────────────────────────────────────────────
+// hub-signature-theme — one-call theming for `<hub-signature>`
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Override the `--hub-signature-*` design tokens in a single include, without
+// coupling the consumer to the component's DOM. Every parameter is OPTIONAL
+// and defaults to `null`: only the parameters you pass are emitted, so the
+// tokens you leave alone keep resolving through their own defaults.
+// Token-based and self-contained (no Bootstrap dependencies).
+//
+// The field's tokens default to the `ng-hub-ui-forms` field contract —
+// `--hub-input-*` for the drawing surface, `--hub-label-*` for the label —
+// before falling back to `sys` and `ref`. Theming a form therefore themes its
+// signature field too; reach for this mixin when the signature has to depart
+// from the inputs around it, not to make it match them.
+//
+// The five parameters cover the drawing surface, the text colour, the border
+// and its radius, and the border colour on focus. `$color` also carries the
+// ink, because the stroke defaults to `currentColor`. The remaining
+// `--hub-signature-*` tokens — border width, focus shadow, label colour and
+// size, font size, action gap — are set as custom properties directly.
+//
+// @example
+//
+//   @use 'ng-hub-ui-signature/styles' as *;
+//
+//   .contract-panel--dark {
+//     @include hub-signature-theme(
+//       $background: #0f172a,
+//       $color: rgba(255, 255, 255, 0.92),
+//       $border-color: rgba(255, 255, 255, 0.24),
+//       $border-radius: 12px,
+//       $focus-border-color: #7dd3fc
+//     );
+//   }
+//
+// scss-docs-start hub-signature-theme
 @mixin hub-signature-theme(
 	$background: null,
 	$color: null,
@@ -26,3 +60,4 @@
 		}
 	}
 }
+// scss-docs-end hub-signature-theme

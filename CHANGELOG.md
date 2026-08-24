@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The `hub-signature-theme()` mixin now documents itself where the tooling can read it.** Its header was written as a `/** … */` block, and the documentation generator only parses `//` headers delimited by `scss-docs-start` / `scss-docs-end` markers — so the mixin was skipped outright and the library's page showed no theming section at all, despite the mixin having shipped since 22.0.0. The header is now in the format the generator reads, and the eleven `--hub-signature-*` slots it covers appear on the site. Comment-only: the mixin's parameters, defaults and emitted declarations are byte-identical.
+
 ## [22.1.1] - 2026-08-17
 
 ### Fixed
