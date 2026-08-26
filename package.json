@@ -12,7 +12,16 @@
 		"url": "https://github.com/carlos-morcillo/ng-hub-ui-signature/issues"
 	},
 	"homepage": "https://hubui.dev/en/signature/overview/",
-	"keywords": ["angular", "signature", "canvas", "forms", "cva", "svg", "ng-hub-ui", "standalone"],
+	"keywords": [
+		"angular",
+		"signature",
+		"canvas",
+		"forms",
+		"cva",
+		"svg",
+		"ng-hub-ui",
+		"standalone"
+	],
 	"peerDependencies": {
 		"@angular/common": ">=21.0.0",
 		"@angular/core": ">=21.0.0",

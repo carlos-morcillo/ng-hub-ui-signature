@@ -52,7 +52,9 @@
 		<div class="hub-field__feedback" role="alert">
 			<ul>
 				@for (error of errors | keyvalue; track error.key) {
-					<li><span class="hub-field__feedback-text">{{ getInvalidFeedbackTemplate(error.key, error.value) }}</span></li>
+					<li>
+						<span class="hub-field__feedback-text">{{ getInvalidFeedbackTemplate(error.key, error.value) }}</span>
+					</li>
 				}
 			</ul>
 		</div>

@@ -108,7 +108,9 @@ export class HubSignatureComponent extends HubFieldControl {
 				redo: this.getStaticLabel(labels.redo, 'HUBUI.SIGNATURE.ACTION.REDO', defaultHubSignatureLabels.redo)
 			});
 
-			const subscriptions = (Object.entries(labels) as [keyof HubSignatureResolvedLabels, HubSignatureLabel | undefined][])
+			const subscriptions = (
+				Object.entries(labels) as [keyof HubSignatureResolvedLabels, HubSignatureLabel | undefined][]
+			)
 				.filter(([, value]) => value !== undefined && this.isLabelSource(value))
 				.map(([key, source]) =>
 					(source as HubSignatureLabelSource).subscribe((value) => {
