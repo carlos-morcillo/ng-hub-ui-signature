@@ -1,5 +1,27 @@
 # Changelog
 
+## [22.5.0] - 2026-09-01
+
+### Fixed
+
+- **`[labelType]` is read.** It was declared, compiled, type-checked and never looked at: the template toggled only `--readonly`, `--disabled`, `--invalid` and `--valid`, so a team migrating a horizontal form bound the input, saw a stacked label, and went hunting through `ng-hub-ui-forms` for a bug that was not there. `horizontal` now places the label in a first grid column beside the drawing surface — capped and ellipsized at `--hub-form-label-horizontal-max-width` — with the action row, helper text and validation feedback stacked in the second, which is the shape the sibling fields produce.
+
+  The layout lives in this component's own stylesheet under `.hub-signature--horizontal` rather than borrowing `.hub-field--horizontal` from the forms sheet. That grid places `> .hub-field__label` and `> .hub-field__body`, neither of which this template has, and both sheets would then set `gap` on the same element at identical specificity — a race decided by stylesheet injection order, which is not stable between the dev server and a production build. The same `--hub-form-*` tokens are honoured, so the result lines up with the fields around it.
+
+  **`floating` still falls back to `stacked`, deliberately.** A floating label reuses the space an empty text control's value would occupy and is driven by `:placeholder-shown`; a canvas has neither, and a label parked inside the box would sit on top of the ink the moment anyone signed. The family's other non-text fields — `hub-slider`, `hub-segmented`, `hub-otp-input` — take the same position while still accepting the shared `HubLabelType`.
+
+- **The validation state shows on the drawing surface.** `.hub-signature--invalid` and `.hub-signature--valid` were bound on the root and styled by nothing, so a required-but-empty signature printed an error message under a canvas that looked exactly like a valid one. Every other field of the family turns red; this one did not, and on a long form the message scrolls out of view leaving a submit button that refuses to work for no visible reason. The canvas now takes the danger border and ring when touched and invalid, and the success pair when `[showValid]` is on and the field is touched and valid.
+
+  The colours come from the shared `--hub-form-invalid-*` / `--hub-form-valid-*` contract rather than new `--hub-signature-*` slots, because that is where the family keeps validation — `_field.scss` styles `.hub-field__control--invalid` from exactly these tokens, and a signature-only slot would fragment a decision that belongs to the form.
+
+  **If you wrote the workaround the migration guide used to recommend, delete it.** Your rule and the component's now have identical specificity, so which wins is decided by injection order: a customised colour can silently stop applying in a production build while still working in the dev server. Set `--hub-form-invalid-border-color` instead.
+
+### Added
+
+- **A live theming demo on the library page**, exercising all eleven `--hub-signature-*` slots through `hub-signature-theme()`. The mixin had shipped since 22.0.0 with nothing to look at, so its six newest parameters could only be read about.
+
+  Building it surfaced a trap now documented in `MIGRATION.md`: **setting the tokens on a wrapper element does nothing.** The component declares all eleven slots on the field element itself through `:where(.hub-signature)`, and a value declared on an element always beats one inherited from an ancestor — specificity never enters into it, because they are different elements. This is precisely why the mixin emits `<your scope> :where(.hub-signature)` rather than relying on inheritance, and it also means a rule written inside a component with emulated view encapsulation never matches, since Angular rewrites it with an `_ngcontent` attribute the field's DOM does not carry.
+
 ## [22.4.0] - 2026-09-01
 
 ### Fixed

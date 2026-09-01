@@ -107,7 +107,14 @@ export class HubSignatureComponent extends HubFieldControl {
 	/** Label text rendered with the same contract as the other form fields. */
 	readonly label = input<string>('');
 
-	/** Label placement shared with the forms library. */
+	/**
+	 * Label placement, from the shared forms vocabulary: `stacked` or `horizontal`.
+	 *
+	 * `floating` falls back to `stacked`, as it does on the family's other non-text fields.
+	 * A floating label reuses the space an empty text control's value would occupy, driven by
+	 * `:placeholder-shown` — a canvas has neither, and a label parked inside the box would sit
+	 * on top of the ink the moment anyone signed.
+	 */
 	readonly labelType = input<HubLabelType>(this._labelTypes.Stacked);
 
 	/** Helper text rendered below the field. */

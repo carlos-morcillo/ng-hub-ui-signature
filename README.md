@@ -4,7 +4,7 @@ SVG-backed signature field for Angular forms. It records mouse, touch and pen in
 
 ## Migrating from angular2-signaturepad
 
-`angular2-signaturepad` last published in February 2022. **[Read the migration guide](./MIGRATION.md)** — it maps the full API, shows working code, and states plainly what does not carry over: signatures stored as PNG data URLs cannot be reloaded for editing, and `[labelType]` is accepted but never honoured.
+`angular2-signaturepad` last published in February 2022. **[Read the migration guide](./MIGRATION.md)** — it maps the full API, shows working code, and states plainly what does not carry over: signatures stored as PNG data URLs cannot be reloaded for editing, and a stored SVG only reloads faithfully into a field rendered at the same width.
 
 ## Install
 
@@ -147,3 +147,28 @@ Every field surface is customizable with `--hub-signature-*` variables. The defa
 	@include hub.hub-signature-theme($border-radius: 0.75rem);
 }
 ```
+
+Validation is part of that inheritance: the invalid and valid states colour the drawing surface
+from `--hub-form-invalid-*` and `--hub-form-valid-*`, so a signature turns red beside the inputs
+around it rather than printing a message under a canvas that still looks fine.
+
+**Setting the variables on a wrapper does nothing.** The component declares all eleven slots on the
+field element itself, and a custom property declared on an element always beats one inherited from
+an ancestor — specificity does not come into it, because they are different elements. Target the
+field, which is what the mixin does for you:
+
+```scss
+/* Does nothing: the field overrides this on itself. */
+.contract-form {
+	--hub-signature-bg: #0f172a;
+}
+
+/* Works — and is what @include hub-signature-theme() emits. */
+.contract-form .hub-signature {
+	--hub-signature-bg: #0f172a;
+}
+```
+
+The same catch applies inside a component with emulated view encapsulation: Angular rewrites the
+rule with that component's `_ngcontent` attribute, which the field's DOM does not carry. Theme from
+a global stylesheet, or use `ViewEncapsulation.None`.

@@ -1,13 +1,15 @@
 <!-- Verified against ng-hub-ui-signature@22.2.0 and the published angular2-signaturepad tarball on 2026-09-01. Every claim was checked by two independent adversarial reviews; see tasks/guias-migracion/ in the workspace repo for the review record. Revised for 22.3.0, which closed four of the limitations recorded below. -->
 
-Version covered here: `angular2-signaturepad` **4.0.2** (the current `latest`) and `ng-hub-ui-signature` **22.4.0**. Every claim below was checked against the published tarball of the incumbent and the `ng-hub-ui-signature` source tree.
+Version covered here: `angular2-signaturepad` **4.0.2** (the current `latest`) and `ng-hub-ui-signature` **22.5.0**. Every claim below was checked against the published tarball of the incumbent and the `ng-hub-ui-signature` source tree.
 
 > **If you are pinned to an older release**, six things behave differently from what is described
 > here. Up to **22.2.0**: there was no keyboard path to sign, `pointercancel` committed the partial
 > stroke, `[strokeColor]`'s `currentColor` default was never resolved, and `[validFeedback]` was
 > accepted and never rendered. Up to **22.3.0**: the visible label was not associated with the
 > drawing surface, and `[ariaLabel]` was an untranslated English literal. Each is flagged in place
-> below. Both releases also change public types — see the package's `BREAKING_CHANGES.md`.
+> below. Up to **22.4.0**: `[labelType]` was accepted and never read, and the invalid and valid
+> states never showed on the drawing surface. 22.3.0 and 22.4.0 also change public types — see the
+> package's `BREAKING_CHANGES.md`.
 
 ---
 
@@ -164,9 +166,28 @@ The Sass entry point forwards one mixin:
 }
 ```
 
-Two mechanics to know.
+Three mechanics to know.
 
 The mixin emits its own `:where(.hub-signature)` selector internally, so do not nest it under `:root` — that produces a `:root :where(.hub-signature)` descendant rule, not a root token block. And every parameter defaults to `null` with each declaration guarded by `@if`, so an argument-less include emits nothing at all; since 22.3.0 it raises a Sass `@warn` saying so rather than compiling silently. Before 22.3.0 it also reached only 5 of the 11 `--hub-signature-*` tokens — see [Theming, and what it reaches](#theming-and-what-it-reaches).
+
+**Setting the tokens on a wrapper does nothing.** This is the trap worth internalising, and it is why the mixin emits the selector it does. The component declares all eleven slots on the field element itself, through `:where(.hub-signature)`, and a custom property declared on an element always wins over one inherited from an ancestor — specificity does not enter into it, because these are two different elements. So this silently renders an unthemed field:
+
+```scss
+// Wrong: the value is set on the wrapper and the field overrides it on itself.
+.contract-panel {
+  --hub-signature-bg: #0f172a;
+}
+```
+
+Target the field, which is what `@include hub-signature-theme(...)` does for you (`.contract-panel :where(.hub-signature)`). Written by hand:
+
+```scss
+.contract-panel .hub-signature {
+  --hub-signature-bg: #0f172a;
+}
+```
+
+The same applies inside a component with emulated view encapsulation: Angular rewrites your rule with that component's `_ngcontent` attribute, which the field's own DOM does not carry, so it never matches. Theme from a global stylesheet, or set `ViewEncapsulation.None` on the component that owns the rule.
 
 **The `styles` path is not in the package's `exports` map.** The published `package.json` declares only `.` and `./package.json`; there is no `./styles` subpath. `@use 'ng-hub-ui-signature/styles'` works because Angular resolves Sass through `node_modules` load paths, which ignore `exports` — the file really is at `node_modules/ng-hub-ui-signature/styles/_index.scss`. A toolchain that resolves Sass through `pkg:` URLs, which do honour `exports`, will not find it. Calling it a "Sass entry point" is a convenience, not a package contract.
 
@@ -445,7 +466,7 @@ export class ConsentFormComponent {
 }
 ```
 
-The required marker is derived from the control's validators, and invalid feedback renders inside the field shell — as text only. There is no error border or ring on the canvas; see [The invalid state never shows on the drawing surface](#the-invalid-state-never-shows-on-the-drawing-surface).
+The required marker is derived from the control's validators, and invalid feedback renders inside the field shell. Since 22.5.0 the canvas also takes the error border and ring, like every other field of the family; see [The validation state shows on the drawing surface since 22.5.0](#the-validation-state-shows-on-the-drawing-surface-since-2250).
 
 Note also: do **not** disable this field with `[disabled]` while it is bound to `formControlName`. Use `control.disable()` — see [`[disabled]` collides with reactive forms](#disabled-collides-with-reactive-forms).
 
@@ -655,9 +676,15 @@ No NgModule ships. **Consequence:** the trap noted in [section 2](#registration-
 
 `Point` → `HubSignaturePoint`: both are `{ x, y, … }`, but the third field is a different thing. `time` (epoch milliseconds, used to compute velocity) is dropped; `pressure` (from `PointerEvent.pressure`, defaulting to `0.5`) is added — and, as noted above, never used for anything. `PointGroup` → `HubSignatureStroke`: a `PointGroup` *is* an array; a `HubSignatureStroke` is an object carrying its own `color` and `width`. **Consequence:** `Array<PointGroup>` is not assignable to `HubSignatureStroke[]` in either direction, and a naive structural mapping compiles only after inventing a pressure value while silently losing all timing data. **Workaround:** use an explicit converter like the one in [4.5](#45-converting-stored-todata-output).
 
-### `[labelType]` is accepted and never honoured
+### `[labelType]` honours `horizontal` since 22.5.0; `floating` never will
 
-The input is declared — `labelType = input<HubLabelType>(this._labelTypes.Stacked)` — so it compiles and type-checks on `<hub-signature>`. But `signature.component.html` never reads it: grep returns zero hits. The template toggles only `--readonly`, `--disabled`, `--invalid` and `--valid`; the sibling fields implement layout by toggling `hub-field--horizontal` (and a Floating branch), and the signature template does neither. Worse, its label carries `class="hub-signature__label"` while the forms grid rules target `> .hub-field__label`, so even the correct modifier class would not lay the label out horizontally. **Consequence:** a team migrating a horizontal or floating-label form binds `[labelType]`, sees a stacked label, and goes hunting through `ng-hub-ui-forms` for a bug that is not there. `Horizontal` and `Floating` are silently ignored. **Workaround:** write the layout in your own CSS around the field, and do not bind `[labelType]` at all, so nobody later reads it as a working setting.
+Up to 22.4.0 the input was declared and never read: the template toggled only `--readonly`, `--disabled`, `--invalid` and `--valid`, so both `Horizontal` and `Floating` were silently ignored and a team migrating a horizontal form went hunting through `ng-hub-ui-forms` for a bug that was not there.
+
+`Horizontal` now works. The label sits in a first grid column beside the drawing surface, capped and ellipsized at `--hub-form-label-horizontal-max-width`, with the action row, helper text and validation feedback stacked in the second column — the same shape the sibling fields produce.
+
+It is implemented in the signature's own stylesheet under `.hub-signature--horizontal` rather than by borrowing `.hub-field--horizontal` from the forms sheet. That grid places `> .hub-field__label` and `> .hub-field__body`, neither of which this template has, and both sheets would then set `gap` on the same element at identical specificity — the injection-order race described in [section 2](#theming). The same `--hub-form-*` tokens are honoured, so the result lines up with the fields around it.
+
+**`Floating` still falls back to stacked, and that is deliberate**, not an oversight to be fixed later. A floating label reuses the space an empty text control's value would occupy and is driven by `:placeholder-shown`; a canvas has neither a value area nor a placeholder, and a label parked inside the box would sit on top of the ink the moment anyone signed. The family's other non-text fields — `hub-slider`, `hub-segmented`, `hub-otp-input` — take the same position, documenting `labelType` as `stacked` / `horizontal` while still accepting the shared `HubLabelType`. **Workaround:** if you need a label inside the box, draw it yourself around the field.
 
 ### The keyboard path, and what it costs
 
@@ -681,23 +708,21 @@ Since 22.4.0 the surface is named by `aria-labelledby` pointing back at the visi
 
 **If you are pinned below 22.4.0:** bind `[ariaLabel]` to the same translated text as `[label]` on every field, treat the visible label as decorative for assistive technology, and put your own click target in your markup calling `focus()` on `.hub-signature__canvas`.
 
-### The invalid state never shows on the drawing surface
+### The validation state shows on the drawing surface since 22.5.0
 
-`.hub-signature--invalid` and `.hub-signature--valid` are bound on the root div, and neither is styled by anything. `signature.component.scss` defines rules for `--readonly`, `--disabled` and `:focus-visible` only. The forms package's red border and focus ring hang off `.hub-field__control--invalid` (and its `--valid` mirror), a class this template never applies — its canvas is `.hub-signature__canvas`.
+Up to 22.4.0 `.hub-signature--invalid` and `.hub-signature--valid` were bound on the root div and styled by nothing: `signature.component.scss` defined rules for `--readonly`, `--disabled` and `:focus-visible` only, while the forms package's red border and ring hang off `.hub-field__control--invalid`, a class this template never applies. A required-but-empty signature printed an error message under a canvas that looked exactly like a valid one; on a long form the message scrolled out of view and the user saw a submit button that refused to work for no visible reason.
 
-**Consequence:** a required-but-empty signature prints an error message under a canvas that looks exactly like a valid one. Every other `ng-hub-ui` field turns red; this one does not. On a long form the message scrolls out of view and the user sees a submit button that refuses to work with no visible reason. `[showValid]` is affected the same way in the other direction: it toggles `hub-signature--valid`, which no stylesheet styles, so the surface never shows the success state — since 22.3.0 you at least get the `[validFeedback]` message below the field, but the canvas itself does not change.
+The canvas now takes the danger border when the field is touched and invalid, the success border when `[showValid]` is on and the field is touched and valid, and the matching focus ring in each state. The colours come from the shared `--hub-form-invalid-*` / `--hub-form-valid-*` contract, not from new `--hub-signature-*` slots, because that is where the family keeps validation — `_field.scss` styles `.hub-field__control--invalid` from exactly these tokens, and a signature-only slot would fragment a decision that belongs to the form.
 
-**Workaround:** write the rule yourself, once, in the global stylesheet:
-
-```scss
-.hub-signature--invalid .hub-signature__canvas {
-  border-color: var(--hub-form-invalid-border-color);
-}
-.hub-signature--invalid .hub-signature__canvas:focus-visible {
-  border-color: var(--hub-form-invalid-border-color);
-  box-shadow: 0 0 0 var(--hub-form-focus-ring-width) var(--hub-form-invalid-focus-ring-color);
-}
-```
+> **If you wrote the workaround, delete it.** Earlier revisions of this guide told you to add this to your global stylesheet:
+>
+> ```scss
+> .hub-signature--invalid .hub-signature__canvas {
+>   border-color: var(--hub-form-invalid-border-color);
+> }
+> ```
+>
+> That rule and the component's own now have identical specificity (`0,2,0`), so which one wins is decided by stylesheet injection order — the same instability described [above](#theming) for `gap`. If your colours match the tokens you will not notice; if you customised them, your override may silently stop applying in a production build while still working in the dev server. Remove the workaround and set `--hub-form-invalid-border-color` instead.
 
 ### A single tap commits a stroke
 
@@ -725,7 +750,7 @@ Up to 22.2.0 the input existed on `HubFieldControl` — so it compiled and type-
 
 22.3.0 renders the same `.hub-field__feedback--valid` block as every other field of the family, gated on `showsValid && validFeedback()`. It needs both halves: an opt-in `[showValid]="true"` (or the global `provideHubForms({ showValid: true })`) and a message to show, on a control that is touched and valid.
 
-**Still true:** `[showValid]` also toggles `hub-signature--valid` on the wrapper, and no stylesheet in either package styles that class, so the drawing surface itself does not turn green — you get the message and nothing else. See [the section above](#the-invalid-state-never-shows-on-the-drawing-surface) for the matching gap on the invalid side, and write both rules yourself if you want the state on the canvas.
+Since 22.5.0 `[showValid]` also colours the drawing surface: the same `hub-signature--valid` it has always toggled now carries a success border and focus ring, mirroring the invalid state. See [The validation state shows on the drawing surface since 22.5.0](#the-validation-state-shows-on-the-drawing-surface-since-2250). Between 22.3.0 and 22.4.0 you got the message and no visual change; before 22.3.0, neither.
 
 ### `[disabled]` collides with reactive forms
 
@@ -779,7 +804,8 @@ The case against the incumbent is that it has published nothing since 4.0.2 on 1
 - [ ] Angular is on `>= 21`, with `ng-hub-ui-forms >= 22.0.0` and `ng-hub-ui-utils >= 22.8.0` installed — all three, not just the first two.
 - [ ] `@use 'ng-hub-ui-forms/styles';` present exactly once in the application's global stylesheet, or the helper text and validation feedback render unstyled.
 - [ ] The Sass toolchain confirmed to resolve `ng-hub-ui-signature/styles` through `node_modules` load paths — the package's `exports` map has no `./styles` subpath.
-- [ ] An `--invalid` rule written by hand for `.hub-signature__canvas`; neither package styles the invalid or valid state on the drawing surface.
+- [ ] Every `--hub-signature-*` override written against `.hub-signature` itself, never a wrapper, and from a global stylesheet or a `ViewEncapsulation.None` component.
+- [ ] Any hand-written `--invalid` / `--valid` rule for `.hub-signature__canvas` **removed**: the component styles both states from 22.5.0, and a leftover override collides with it at equal specificity.
 - [ ] The field's rendered gap checked in a production build, not only in the dev server — `.hub-field` and `.hub-signature` set conflicting `display`/`gap` at equal specificity.
 - [ ] Every stored signature classified: raster data URLs (not editable, no conversion path), `toData()` point groups (convertible with rescaling), or nothing stored.
 - [ ] A decision recorded for legacy raster signatures: read-only display, re-capture, or dual-store during a transition — and a validator that stops a leftover data URL from satisfying `required` on a visibly empty field.
@@ -798,7 +824,7 @@ The case against the incumbent is that it has published nothing since 4.0.2 on 1
 - [ ] Disabling driven by `control.disable()`, not by `[disabled]`, on every reactive field.
 - [ ] CSS targeting `signature-pad canvas` retargeted to `.hub-signature__canvas` or the `--hub-signature-*` tokens.
 - [ ] `[controls]` set deliberately — it defaults to `true`.
-- [ ] `[labelType]` not bound: horizontal and floating layouts are ignored and must be written in your own CSS.
+- [ ] `[labelType]` bound only to `stacked` or `horizontal`; `floating` falls back to stacked and always will, so a label inside the box has to be your own markup.
 - [ ] Localization wired through `provideHubTranslationAdapter()` if the application has more than one language, with `HUBUI.SIGNATURE.KEYBOARD_HINT` alongside the three action keys — plus `HUBUI.SIGNATURE.ARIA_LABEL` if any field is a bare surface with no visible `[label]`.
 - [ ] Any `[ariaLabel]` binding on a field that also has a `[label]` removed: from 22.4.0 the label is the accessible name and the input is ignored there, so leaving it in suggests a setting that does nothing.
 - [ ] `[labels]` held in a signal or class property, never as an inline object literal in the template.

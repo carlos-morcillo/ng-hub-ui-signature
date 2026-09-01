@@ -2,6 +2,7 @@ import { Component, signal, viewChild } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HubLabelTypes, type HubLabelType } from 'ng-hub-ui-forms';
 import { provideHubTranslationAdapter } from 'ng-hub-ui-utils';
 import type { HubSignatureDrawEvent } from '../../models/signature.types';
 import { HUB_SIGNATURE_CONFIG, type HubSignatureLabels } from '../../signature-config';
@@ -13,6 +14,7 @@ import { HubSignatureComponent } from './signature.component';
 	template: `<hub-signature
 		[labels]="signatureLabels()"
 		[label]="labelText()"
+		[labelType]="labelPlacement()"
 		[ariaLabel]="accessibleName()"
 		[readonly]="readonlyMode()"
 		[strokeColor]="ink()"
@@ -26,6 +28,7 @@ class HostSignatureComponent {
 	readonly signature = viewChild.required(HubSignatureComponent);
 	readonly signatureLabels = signal<Partial<HubSignatureLabels>>({});
 	readonly labelText = signal('');
+	readonly labelPlacement = signal<HubLabelType>(HubLabelTypes.Stacked);
 	readonly accessibleName = signal('');
 	readonly readonlyMode = signal(false);
 	readonly ink = signal('currentColor');
@@ -456,6 +459,34 @@ describe('HubSignatureComponent', () => {
 		fixture.detectChanges();
 
 		expect(fixture.nativeElement.querySelector('canvas').getAttribute('aria-label')).toBe('Contract signature');
+	});
+
+	it('lays the label beside the field when the label type is horizontal', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.labelText.set('Signature');
+		fixture.componentInstance.labelPlacement.set(HubLabelTypes.Horizontal);
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('.hub-signature--horizontal')).not.toBeNull();
+	});
+
+	it('keeps the label stacked for a label type this field cannot honour', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.labelText.set('Signature');
+		fixture.componentInstance.labelPlacement.set(HubLabelTypes.Floating);
+		fixture.detectChanges();
+
+		// A floating label needs a text-entry control to float over; the family's non-text
+		// fields fall back to stacked rather than inventing a placement.
+		expect(fixture.nativeElement.querySelector('.hub-signature--horizontal')).toBeNull();
+	});
+
+	it('does not lay out horizontally when there is no label to place', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.labelPlacement.set(HubLabelTypes.Horizontal);
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('.hub-signature--horizontal')).toBeNull();
 	});
 
 	it('renders the success feedback once the field is touched and valid', () => {

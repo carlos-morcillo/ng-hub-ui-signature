@@ -149,3 +149,28 @@ Cada superficie del campo se personaliza con variables `--hub-signature-*`. Los 
 	@include hub.hub-signature-theme($border-radius: 0.75rem);
 }
 ```
+
+La validación forma parte de esa herencia: los estados inválido y válido colorean la superficie de
+dibujo desde `--hub-form-invalid-*` y `--hub-form-valid-*`, así que la firma se pone en rojo junto a
+los inputs que la rodean en vez de imprimir un mensaje bajo un lienzo que sigue pareciendo correcto.
+
+**Poner las variables en un contenedor no hace nada.** El componente declara los once slots sobre el
+propio elemento del campo, y una custom property declarada en un elemento siempre gana a la heredada
+de un ancestro —la especificidad no entra en juego, porque son elementos distintos—. Apunta al
+campo, que es lo que hace el mixin por ti:
+
+```scss
+/* No hace nada: el campo lo sobrescribe sobre sí mismo. */
+.contract-form {
+	--hub-signature-bg: #0f172a;
+}
+
+/* Funciona, y es lo que emite @include hub-signature-theme(). */
+.contract-form .hub-signature {
+	--hub-signature-bg: #0f172a;
+}
+```
+
+El mismo tropiezo aparece dentro de un componente con encapsulación emulada: Angular reescribe la
+regla con el atributo `_ngcontent` de ese componente, que el DOM del campo no lleva. Da tema desde
+una hoja global, o usa `ViewEncapsulation.None`.

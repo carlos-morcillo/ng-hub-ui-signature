@@ -19,6 +19,34 @@
 	font-size: var(--hub-signature-font-size);
 }
 
+// Horizontal placement is written here rather than borrowing `.hub-field--horizontal` from the
+// forms sheet: that grid places `> .hub-field__label` and `> .hub-field__body`, neither of which
+// this template has, and both sheets would then set `gap` on the same element at identical
+// specificity — a race decided by injection order. The same `--hub-form-*` tokens are honoured,
+// so the result lines up with the fields around it.
+.hub-signature--horizontal {
+	grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+	column-gap: var(--hub-form-row-gap, 1rem);
+	row-gap: var(--hub-form-field-gap, 0.5rem);
+
+	.hub-signature__label {
+		grid-column: 1;
+		align-self: start;
+		max-width: var(--hub-form-label-horizontal-max-width, 12rem);
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+
+	.hub-signature__surface,
+	.hub-signature__actions,
+	.hub-field__form-text,
+	.hub-field__feedback {
+		grid-column: 2;
+		min-width: 0;
+	}
+}
+
 .hub-signature__label {
 	color: var(--hub-signature-label-color);
 	font-size: var(--hub-signature-label-font-size);
@@ -47,6 +75,32 @@
 .hub-signature__canvas:focus-visible {
 	border-color: var(--hub-signature-focus-border-color);
 	box-shadow: var(--hub-signature-focus-shadow);
+}
+
+// Validation state on the drawing surface itself. Every other field of the family turns its
+// control red; without this the signature printed an error message under a canvas that looked
+// exactly like a valid one, and on a long form the message scrolls out of sight.
+//
+// The colours come from the shared `--hub-form-*` contract rather than from new
+// `--hub-signature-*` slots, because that is where the family keeps validation: `_field.scss`
+// styles `.hub-field__control--invalid` from these same tokens. A signature-only slot would
+// fragment a decision that belongs to the form.
+.hub-signature--invalid .hub-signature__canvas {
+	border-color: var(--hub-form-invalid-border-color);
+}
+
+.hub-signature--invalid .hub-signature__canvas:focus-visible {
+	border-color: var(--hub-form-invalid-border-color);
+	box-shadow: 0 0 0 var(--hub-form-focus-ring-width) var(--hub-form-invalid-focus-ring-color);
+}
+
+.hub-signature--valid .hub-signature__canvas {
+	border-color: var(--hub-form-valid-border-color);
+}
+
+.hub-signature--valid .hub-signature__canvas:focus-visible {
+	border-color: var(--hub-form-valid-border-color);
+	box-shadow: 0 0 0 var(--hub-form-focus-ring-width) var(--hub-form-valid-focus-ring-color);
 }
 
 // Keyboard pen. Sits over the canvas rather than on it, so it never lands in the

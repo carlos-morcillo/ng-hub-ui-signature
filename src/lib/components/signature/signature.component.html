@@ -1,5 +1,6 @@
 <div
 	class="hub-field hub-signature"
+	[class.hub-signature--horizontal]="label() && labelType() === _labelTypes.Horizontal"
 	[class.hub-signature--readonly]="readonly()"
 	[class.hub-signature--disabled]="disabled()"
 	[class.hub-signature--invalid]="isInvalid"
