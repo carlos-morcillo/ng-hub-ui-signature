@@ -19,6 +19,11 @@ export interface HubSignatureLabels {
 	 * Rewrite it, do not merely translate it, if the surrounding application renames those keys.
 	 */
 	keyboardHint: HubSignatureLabel;
+	/**
+	 * Accessible name for a field with no visible `[label]`. A field that has one takes its name
+	 * from that label instead, so the two can never disagree, and this is never consulted.
+	 */
+	ariaLabel: HubSignatureLabel;
 }
 
 /** Concrete text rendered after resolving reactive labels. */
@@ -27,6 +32,7 @@ export interface HubSignatureResolvedLabels {
 	undo: string;
 	redo: string;
 	keyboardHint: string;
+	ariaLabel: string;
 }
 
 /** Global options shared by every signature field. */
@@ -45,7 +51,8 @@ export const defaultHubSignatureLabels: HubSignatureLabels & HubSignatureResolve
 	undo: 'Undo stroke',
 	redo: 'Redo stroke',
 	keyboardHint:
-		'Sign with the keyboard: arrow keys move the pen, holding Shift moves it further, Space or Enter lowers and lifts it, and Escape discards the stroke in progress.'
+		'Sign with the keyboard: arrow keys move the pen, holding Shift moves it further, Space or Enter lowers and lifts it, and Escape discards the stroke in progress.',
+	ariaLabel: 'Signature'
 };
 
 /** Default signature configuration. */

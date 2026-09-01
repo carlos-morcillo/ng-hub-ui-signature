@@ -30,13 +30,16 @@ This table details the functionalities of the `ng-hub-ui-signature` library and 
 |                       | `required` derived from the control's validators               |       [x]       |
 |                       | `invalidFeedbackTemplateFn` — per-field error messages         |       [ ]       |
 | **Labelling**         | `label`, `formText`                                            |       [x]       |
-|                       | `ariaLabel`                                                    |       [ ]       |
+|                       | `label` is the accessible name, via `aria-labelledby`          |       [x]       |
+|                       | Clicking the label focuses the drawing surface                 |       [x]       |
+|                       | `ariaLabel` — names a surface with no visible label            |       [ ]       |
 |                       | `aria-describedby` keyboard instructions                       |       [ ]       |
 |                       | `labelType` — from the shared forms vocabulary                 |       [ ]       |
 |                       | `classlist` on the drawing surface                             |       [ ]       |
 | **Localization**      | Shared Hub UI label adapter (Transloco, ngx-translate…)        |       [x]       |
 |                       | `labels` — per-field override of the translated actions        |       [ ]       |
 |                       | `keyboardHint` — the translated keyboard instructions          |       [ ]       |
+|                       | `ariaLabel` — the translated accessible name                   |       [ ]       |
 | **Theming**           | The eleven `--hub-signature-*` slots                           |       [ ]       |
 |                       | `hub-signature-theme()` mixin                                  |       [ ]       |
 |                       | Inherits the `ng-hub-ui-forms` token family                    |       [ ]       |

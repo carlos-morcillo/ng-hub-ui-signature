@@ -12,6 +12,8 @@ import { HubSignatureComponent } from './signature.component';
 	imports: [HubSignatureComponent],
 	template: `<hub-signature
 		[labels]="signatureLabels()"
+		[label]="labelText()"
+		[ariaLabel]="accessibleName()"
 		[readonly]="readonlyMode()"
 		[strokeColor]="ink()"
 		[showValid]="true"
@@ -23,6 +25,8 @@ import { HubSignatureComponent } from './signature.component';
 class HostSignatureComponent {
 	readonly signature = viewChild.required(HubSignatureComponent);
 	readonly signatureLabels = signal<Partial<HubSignatureLabels>>({});
+	readonly labelText = signal('');
+	readonly accessibleName = signal('');
 	readonly readonlyMode = signal(false);
 	readonly ink = signal('currentColor');
 	readonly validMessage = signal<string | null>(null);
@@ -361,6 +365,97 @@ describe('HubSignatureComponent', () => {
 		signature.finishStroke(pointerEvent());
 
 		expect(signature.toStrokes()[0].color).toBe('#123456');
+	});
+
+	it('names the drawing surface from the visible label', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.labelText.set('Account holder signature');
+		fixture.detectChanges();
+		const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+
+		const labelledBy = canvas.getAttribute('aria-labelledby');
+		const label = fixture.nativeElement.querySelector(`[id="${labelledBy}"]`) as HTMLElement | null;
+
+		expect(labelledBy).toBeTruthy();
+		expect(label?.textContent?.trim()).toContain('Account holder signature');
+		// aria-labelledby outranks aria-label, so one beside it would be unreachable dead weight.
+		expect(canvas.getAttribute('aria-label')).toBeNull();
+	});
+
+	it('falls back to the accessible label when no visible label is rendered', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+		const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+
+		expect(canvas.getAttribute('aria-labelledby')).toBeNull();
+		expect(canvas.getAttribute('aria-label')).toBe('Signature');
+	});
+
+	it('keeps the keyboard description separate from the accessible name', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.labelText.set('Signature');
+		fixture.detectChanges();
+		const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+
+		const labelledBy = canvas.getAttribute('aria-labelledby');
+		const describedBy = canvas.getAttribute('aria-describedby');
+
+		// Name and description are different ARIA properties; each must resolve to its own node.
+		expect(labelledBy).toBeTruthy();
+		expect(describedBy).toBeTruthy();
+		expect(labelledBy).not.toBe(describedBy);
+		expect(fixture.nativeElement.querySelector(`[id="${labelledBy}"]`)?.textContent).toContain('Signature');
+		expect(fixture.nativeElement.querySelector(`[id="${describedBy}"]`)?.textContent).toMatch(/arrow keys/i);
+	});
+
+	it('focuses the drawing surface when the visible label is clicked', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.labelText.set('Signature');
+		fixture.detectChanges();
+		const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+
+		(fixture.nativeElement.querySelector('label') as HTMLLabelElement).click();
+
+		expect(document.activeElement).toBe(canvas);
+	});
+
+	it('translates the accessible name through the shared translation adapter', () => {
+		const translations = new BehaviorSubject<Record<string, unknown>>({
+			HUBUI: { SIGNATURE: { ARIA_LABEL: 'Signature' } }
+		});
+		TestBed.configureTestingModule({ providers: [provideHubTranslationAdapter(() => translations)] });
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+
+		translations.next({ HUBUI: { SIGNATURE: { ARIA_LABEL: 'Firma' } } });
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('canvas').getAttribute('aria-label')).toBe('Firma');
+	});
+
+	it('lets an explicitly bound ariaLabel outrank the dictionary', () => {
+		const translations = new BehaviorSubject<Record<string, unknown>>({
+			HUBUI: { SIGNATURE: { ARIA_LABEL: 'Firma' } }
+		});
+		TestBed.configureTestingModule({ providers: [provideHubTranslationAdapter(() => translations)] });
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.accessibleName.set('Contract signature');
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('canvas').getAttribute('aria-label')).toBe('Contract signature');
+	});
+
+	it('keeps an explicit ariaLabel when a reactive label source emits into the same slot', () => {
+		const stream = new BehaviorSubject('Firma');
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.accessibleName.set('Contract signature');
+		fixture.componentInstance.signatureLabels.set({ ariaLabel: stream });
+		fixture.detectChanges();
+
+		stream.next('Firma del titular');
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('canvas').getAttribute('aria-label')).toBe('Contract signature');
 	});
 
 	it('renders the success feedback once the field is touched and valid', () => {

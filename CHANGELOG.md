@@ -1,5 +1,27 @@
 # Changelog
 
+## [22.4.0] - 2026-09-01
+
+### Fixed
+
+- **The visible label now names the drawing surface.** The template rendered `<label for>` pointing at the canvas, and `for` associates only with labelable elements — `button`, `input`, `meter`, `output`, `progress`, `select`, `textarea`. A `<canvas>` is none of them, so the attribute was inert: no association existed, clicking the label did nothing, and the accessible name came entirely from `[ariaLabel]`. The surface is now named with `aria-labelledby`, the only mechanism that works on a non-labelable element and the only one unaffected by `role="application"`.
+
+  The `for` attribute is gone rather than left beside the new wiring, because an attribute that claims an association the browser never makes is worse than no attribute at all. Clicking the label focuses the surface instead, which is the half of the label contract that was actually missing.
+
+  `aria-labelledby` and `aria-label` are now mutually exclusive on the canvas. They are not additive: `aria-labelledby` outranks `aria-label` outright in the accessible-name computation, so emitting both would leave one of them permanently unreachable and mislead anyone reading the DOM. A field with a `[label]` carries only `aria-labelledby`; a field without one carries only `aria-label`. The required asterisk stays `aria-hidden` and out of the computed name.
+
+- **`[ariaLabel]` goes through the translation dictionary.** It was an `input<string>('Signature')` with a hardcoded English literal and no `HUBUI.SIGNATURE.*` key behind it, so an application that localized every button through the shared adapter still had its drawing surface announce itself in English. It now resolves like every other piece of text the component owns: the explicit input first, then `[labels]` / `provideHubSignature()`, then `HUBUI.SIGNATURE.ARIA_LABEL`, then the English fallback.
+
+  Its default changed from `'Signature'` to `''` so that "not set" is distinguishable from "set to the old default"; the resolved name is still `Signature` when nothing else supplies one.
+
+### Changed
+
+- **The accessible name comes from `[label]` when there is one, and `[ariaLabel]` is the fallback for a bare surface.** This is the part that actually closes WCAG 2.5.3 (Label in Name): translating `[ariaLabel]` would merely have made it *possible* to keep the visible label and the announced name in agreement, still requiring every consumer to pass the same string twice on every field and to remember it forever. Deriving the name from the label makes disagreement impossible — they are the same node. `[ariaLabel]` is now consulted only where there is genuinely nothing to point at: a surface with no visible label, in a layout that labels it some other way.
+
+  **Binding `[ariaLabel]` on a field that also has a `[label]` no longer does anything.** Remove those bindings rather than leaving a setting that looks live and is not.
+
+- **`HubSignatureLabels` and `HubSignatureResolvedLabels` gained a required `ariaLabel` member.** Everything the library accepts takes a `Partial<…>`, so overrides are unaffected; only a fully annotated label object has to change. **Breaking**; see `BREAKING_CHANGES.md`.
+
 ## [22.3.0] - 2026-09-01
 
 ### Added

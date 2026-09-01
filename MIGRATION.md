@@ -1,12 +1,13 @@
 <!-- Verified against ng-hub-ui-signature@22.2.0 and the published angular2-signaturepad tarball on 2026-09-01. Every claim was checked by two independent adversarial reviews; see tasks/guias-migracion/ in the workspace repo for the review record. Revised for 22.3.0, which closed four of the limitations recorded below. -->
 
-Version covered here: `angular2-signaturepad` **4.0.2** (the current `latest`) and `ng-hub-ui-signature` **22.3.0**. Every claim below was checked against the published tarball of the incumbent and the `ng-hub-ui-signature` source tree.
+Version covered here: `angular2-signaturepad` **4.0.2** (the current `latest`) and `ng-hub-ui-signature` **22.4.0**. Every claim below was checked against the published tarball of the incumbent and the `ng-hub-ui-signature` source tree.
 
-> **If you are pinned to 22.2.0 or earlier**, four things behave differently from what is described
-> here: there was no keyboard path to sign, `pointercancel` committed the partial stroke,
-> `[strokeColor]`'s `currentColor` default was never resolved, and `[validFeedback]` was accepted
-> and never rendered. Each is flagged in place below. 22.3.0 also changes the `(drawStart)` /
-> `(drawEnd)` payload type; see the package's `BREAKING_CHANGES.md`.
+> **If you are pinned to an older release**, six things behave differently from what is described
+> here. Up to **22.2.0**: there was no keyboard path to sign, `pointercancel` committed the partial
+> stroke, `[strokeColor]`'s `currentColor` default was never resolved, and `[validFeedback]` was
+> accepted and never rendered. Up to **22.3.0**: the visible label was not associated with the
+> drawing surface, and `[ariaLabel]` was an untranslated English literal. Each is flagged in place
+> below. Both releases also change public types — see the package's `BREAKING_CHANGES.md`.
 
 ---
 
@@ -99,7 +100,7 @@ import { HubSignatureComponent } from 'ng-hub-ui-signature';
 @Component({
   selector: 'app-consent',
   imports: [HubSignatureComponent],
-  template: `<hub-signature label="Signature" ariaLabel="Signature" />`
+  template: `<hub-signature label="Signature" />`
 })
 export class ConsentComponent {}
 ```
@@ -134,11 +135,20 @@ bootstrapApplication(AppComponent, {
 
 Add `HUBUI.SIGNATURE.ACTION.CLEAR`, `HUBUI.SIGNATURE.ACTION.UNDO`, `HUBUI.SIGNATURE.ACTION.REDO` and — since 22.3.0 — `HUBUI.SIGNATURE.KEYBOARD_HINT` to your language files. The last one is the instruction read out to screen-reader users on focus, explaining how to sign with the keyboard; leaving it out is safe but announces the instructions in English. Rewrite rather than translate it if your application renames those keys for its users.
 
-That covers the three action buttons and the keyboard instructions, and nothing else. **`[ariaLabel]` is not translated by any of it.** It defaults to the hardcoded English literal `'Signature'`, with no `HUBUI.SIGNATURE.*` key behind it, and it is the accessible name of the drawing surface itself — so in a Spanish or bilingual application every signature field announces itself in English no matter how the adapter is wired. Bind it, on every field, to the same translated text you pass to `[label]`:
+Since 22.4.0 the accessible name of the drawing surface is handled too, and mostly without you: a field with a visible `[label]` takes its name from that label, so translating `[label]` translates the announcement. Nothing to bind twice.
 
 ```html
-<hub-signature [label]="'CONSENT.SIGNATURE' | transloco" [ariaLabel]="'CONSENT.SIGNATURE' | transloco" />
+<!-- 22.4.0 and later: the visible label is the accessible name. -->
+<hub-signature [label]="'CONSENT.SIGNATURE' | transloco" />
 ```
+
+`[ariaLabel]` is only consulted when there is no visible label, and it resolves through the same chain as everything else: the explicit input first, then `[labels]` / `provideHubSignature()`, then `HUBUI.SIGNATURE.ARIA_LABEL`, then the English fallback `'Signature'`. Add that key alongside the others if any of your fields are bare surfaces.
+
+> **Before 22.4.0** `[ariaLabel]` was an untranslated `input<string>('Signature')` with no dictionary key behind it, and it was the *only* source of the accessible name. On those versions bind it explicitly, on every field, to the same translated text as `[label]`:
+>
+> ```html
+> <hub-signature [label]="'CONSENT.SIGNATURE' | transloco" [ariaLabel]="'CONSENT.SIGNATURE' | transloco" />
+> ```
 
 `provideHubSignature({ labels: { … } })` and the per-instance `[labels]` input exist, but with plain strings they are for single-language applications or a deliberate one-field exception. See [Static labels outrank the translation dictionary](#static-labels-outrank-the-translation-dictionary) for why — and note that if you pass reactive sources through `[labels]`, the containing object must live in a signal or a class property, never as an inline object literal in the template.
 
@@ -201,7 +211,7 @@ Every exported member of `angular2-signaturepad` 4.0.2, and its status against `
 | `options.backgroundColor` | — | **Missing** as a bitmap fill. The element has a CSS background (`--hub-signature-bg`); the bitmap does not. |
 | `options.throttle`, `options.minDistance` | — | **Missing.** No point thinning; every `pointermove` is recorded. |
 | `options.onBegin` / `options.onEnd` | `(drawStart)` / `(drawEnd)` | **Renamed.** Outputs, not options. In the incumbent these two were overwritten by the wrapper anyway. |
-| — | `[label]`, `[formText]`, `[readonly]`, `[controls]`, `[ariaLabel]`, `[labels]`, `[classlist]` | New. `[ariaLabel]` is the field's accessible name and defaults to the untranslated literal `'Signature'`. |
+| — | `[label]`, `[formText]`, `[readonly]`, `[controls]`, `[ariaLabel]`, `[labels]`, `[classlist]` | New. Since 22.4.0 `[label]` is also the accessible name, through `aria-labelledby`; `[ariaLabel]` (default `''`) names only a surface that has no visible label, and resolves through the translation dictionary like the action labels. Before 22.4.0 `[ariaLabel]` defaulted to the untranslated literal `'Signature'` and was the sole source of the name. |
 | — | `[labelType]` | **New, accepted and never read.** Declared as `input<HubLabelType>(Stacked)`, but the template never reads it: `Horizontal` and `Floating` are silently ignored and the label is always stacked. See below. |
 | — | `[disabled]`, `[required]`, `[formControlName]`, `[showValid]`, `[validFeedback]`, `[invalidFeedbackTemplateFn]` | New, inherited from `HubFieldControl` / `HubFormControl`. `[validFeedback]` renders since 22.3.0 (accepted and ignored before it); `[showValid]` gates that message but still toggles a `--valid` class no stylesheet styles, so the drawing surface itself does not change; `[disabled]` collides with `FormControlName`'s own `disabled` input. |
 
@@ -280,7 +290,6 @@ All of these are exported with `export type { … }`, not as values — see the 
 ```html
 <hub-signature
   label="Signature"
-  ariaLabel="Signature"
   [height]="300"
   [strokeWidth]="5"
   [strokeColor]="'#000000'"
@@ -289,7 +298,7 @@ All of these are exported with `export type { … }`, not as values — see the 
   (drawEnd)="drawComplete($event)" />
 ```
 
-`[controls]="false"` reproduces the incumbent's bare surface; leaving it at its default `true` gives a clear/undo/redo row. `[strokeColor]` is bound explicitly on purpose — see [The stroke colour that reaches the archive](#the-stroke-colour-that-reaches-the-archive). `ariaLabel` is bound explicitly too, because it is the accessible name and its default is an untranslated English literal.
+`[controls]="false"` reproduces the incumbent's bare surface; leaving it at its default `true` gives a clear/undo/redo row. `[strokeColor]` is bound explicitly on purpose — see [The stroke colour that reaches the archive](#the-stroke-colour-that-reaches-the-archive). There is no `[ariaLabel]` here because there is a `[label]`: from 22.4.0 the visible label _is_ the accessible name, and binding both would be a setting that does nothing. Reach for `[ariaLabel]` only when you drop `[label]` as well.
 
 ### 4.2 Options bag and imperative handle
 
@@ -353,7 +362,6 @@ import { HubSignatureComponent, type HubSignatureDrawEvent } from 'ng-hub-ui-sig
     <hub-signature
       class="consent-signature"
       label="Signature"
-      ariaLabel="Signature"
       [height]="300"
       [strokeWidth]="5"
       [strokeColor]="'#000000'"
@@ -413,7 +421,6 @@ import { HubSignatureComponent } from 'ng-hub-ui-signature';
       <hub-signature
         formControlName="signature"
         label="Signature"
-        ariaLabel="Signature"
         formText="Sign inside the box using your finger, pen or mouse."
         [strokeColor]="'#000000'"
         [height]="300" />
@@ -666,9 +673,13 @@ Two things to weigh before you count it as solved.
 
 If the accessibility improvements are part of the case for migrating, be precise about which ones. Real: the keyboard drawing path, `aria-required`, `aria-invalid`, `aria-readonly` and `aria-disabled` on the canvas, focus-visible styling, and the validation feedback region with `role="alert"`.
 
-**Label association is not real.** The template renders `<label [for]="id" class="hub-signature__label">` pointing at `<canvas [id]="id">`, and `<canvas>` is not a labelable element in HTML — `for` associates only with `button`, `input`, `meter`, `output`, `progress`, `select` and `textarea`. No programmatic association is created and clicking the label does nothing. The field's accessible name comes solely from `[attr.aria-label]="ariaLabel()"`, which defaults to the hardcoded English literal `'Signature'` and is not routed through the `HUBUI.SIGNATURE.*` dictionary. So a Spanish form shows "Firma del titular" and announces "Signature" — the visible label and the accessible name disagree, which is a WCAG 2.5.3 (Label in Name) problem. This one is not fixed in 22.3.0.
+**Label association, fixed in 22.4.0.** Up to 22.3.0 the template rendered `<label [for]="id">` pointing at `<canvas [id]="id">`, and `<canvas>` is not a labelable element in HTML — `for` associates only with `button`, `input`, `meter`, `output`, `progress`, `select` and `textarea`. The attribute was inert: no association was created and clicking the label did nothing. The accessible name came solely from `[attr.aria-label]="ariaLabel()"`, an untranslated English literal, so a Spanish form showed "Firma del titular" and announced "Signature" — a WCAG 2.5.3 (Label in Name) failure.
 
-**Workaround:** bind `[ariaLabel]` to the same translated text as `[label]` on every field, and treat the visible label as decorative for assistive technology. Clicking the label will still do nothing; if that matters, put the click target in your own markup and call `focus()` on `.hub-signature__canvas`.
+Since 22.4.0 the surface is named by `aria-labelledby` pointing back at the visible label, which is the only mechanism that works on a non-labelable element and works regardless of `role="application"`. The consequence worth understanding: **the visible label _is_ the accessible name**, so the two cannot disagree, and `[ariaLabel]` is not consulted at all on a field that has a `[label]`. The required asterisk is `aria-hidden` and stays out of the name. Clicking the label now focuses the surface, which is the other half of what a label association buys you.
+
+`[ariaLabel]` remains for the case it is actually needed — a bare surface with `[controls]="false"` and no visible label, sitting in a layout that labels it some other way — and it is translatable there; see [Localized action labels](#localized-action-labels).
+
+**If you are pinned below 22.4.0:** bind `[ariaLabel]` to the same translated text as `[label]` on every field, treat the visible label as decorative for assistive technology, and put your own click target in your markup calling `focus()` on `.hub-signature__canvas`.
 
 ### The invalid state never shows on the drawing surface
 
@@ -788,7 +799,8 @@ The case against the incumbent is that it has published nothing since 4.0.2 on 1
 - [ ] CSS targeting `signature-pad canvas` retargeted to `.hub-signature__canvas` or the `--hub-signature-*` tokens.
 - [ ] `[controls]` set deliberately — it defaults to `true`.
 - [ ] `[labelType]` not bound: horizontal and floating layouts are ignored and must be written in your own CSS.
-- [ ] Localization wired through `provideHubTranslationAdapter()` if the application has more than one language, with `HUBUI.SIGNATURE.KEYBOARD_HINT` alongside the three action keys, **and** `[ariaLabel]` bound to the translated label text on every field.
+- [ ] Localization wired through `provideHubTranslationAdapter()` if the application has more than one language, with `HUBUI.SIGNATURE.KEYBOARD_HINT` alongside the three action keys — plus `HUBUI.SIGNATURE.ARIA_LABEL` if any field is a bare surface with no visible `[label]`.
+- [ ] Any `[ariaLabel]` binding on a field that also has a `[label]` removed: from 22.4.0 the label is the accessible name and the input is ignored there, so leaving it in suggests a setting that does nothing.
 - [ ] `[labels]` held in a signal or class property, never as an inline object literal in the template.
 - [ ] Server-side rendering proven for a page containing the field, if the application uses `@angular/ssr` — `writeValue()` touches the canvas with no platform guard.
 - [ ] The keyboard signing path tested with the screen readers your users actually run, and the missing label association acknowledged with whoever owns accessibility compliance.

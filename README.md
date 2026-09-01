@@ -4,7 +4,7 @@ SVG-backed signature field for Angular forms. It records mouse, touch and pen in
 
 ## Migrating from angular2-signaturepad
 
-`angular2-signaturepad` last published in February 2022. **[Read the migration guide](./MIGRATION.md)** — it maps the full API, shows working code, and states plainly what does not carry over: signatures stored as PNG data URLs cannot be reloaded for editing, and the visible `<label>` is not programmatically associated with the canvas.
+`angular2-signaturepad` last published in February 2022. **[Read the migration guide](./MIGRATION.md)** — it maps the full API, shows working code, and states plainly what does not carry over: signatures stored as PNG data URLs cannot be reloaded for editing, and `[labelType]` is accepted but never honoured.
 
 ## Install
 
@@ -82,6 +82,30 @@ translate them under `HUBUI.SIGNATURE.KEYBOARD_HINT`.
 The canvas carries `role="application"` so screen readers hand it the arrow keys instead of using
 them to navigate the document. Bear in mind that a keyboard signature is a polyline, not
 handwriting; decide deliberately whether that satisfies what your signature is evidence of.
+
+## How the field is named
+
+`[label]` is the accessible name. The drawing surface is wired to it with `aria-labelledby`, so the
+text a sighted user reads and the text a screen reader announces are the same node and cannot drift
+apart. Translating `[label]` translates the announcement; there is nothing to bind twice. Clicking
+the label focuses the surface.
+
+```html
+<hub-signature [label]="'CONSENT.SIGNATURE' | transloco" />
+```
+
+`[ariaLabel]` names a surface that has **no** visible label — a bare box in a layout that labels it
+some other way. On a field that has a `[label]` it is not consulted at all, so don't bind it there.
+Left empty it resolves like the action labels: `[labels]` / `provideHubSignature()`, then
+`HUBUI.SIGNATURE.ARIA_LABEL`, then the English fallback `Signature`.
+
+```html
+<hub-signature [controls]="false" [ariaLabel]="'CONSENT.SIGNATURE' | transloco" />
+```
+
+`<label for>` is deliberately not used: `for` associates only with labelable elements — `button`,
+`input`, `meter`, `output`, `progress`, `select`, `textarea` — and a `<canvas>` is none of them, so
+the attribute would sit in the markup claiming an association the browser never makes.
 
 ## Localized actions
 

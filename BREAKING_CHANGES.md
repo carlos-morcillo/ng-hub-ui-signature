@@ -6,6 +6,69 @@ This file documents breaking changes and migration steps for `ng-hub-ui-signatur
 > compatibility. A breaking change therefore ships as a **minor**, and this file is the only warning
 > you get — read it before upgrading within a major line.
 
+## [22.4.0]
+
+### `[ariaLabel]` is ignored on a field that has a `[label]`
+
+**What changed.** The drawing surface is now named by `aria-labelledby` pointing at the visible
+label. `aria-labelledby` outranks `aria-label` in the accessible-name computation, so the component
+emits one or the other, never both: with a `[label]` you get `aria-labelledby` and no `aria-label`
+at all, and `[ariaLabel]` is not consulted.
+
+**Why.** The visible label and the accessible name could disagree, and routinely did — a Spanish
+form showing "Firma del titular" announced "Signature". That is a WCAG 2.5.3 (Label in Name)
+failure. Making the label *be* the name removes the possibility rather than asking every consumer
+to keep two strings in sync forever.
+
+**What you have to do.** Delete `[ariaLabel]` from every field that also has a `[label]`. Nothing
+breaks if you leave it — the binding is simply inert — but it reads as a live setting and is not.
+
+```html
+<!-- Before -->
+<hub-signature [label]="'CONSENT.SIGNATURE' | transloco" [ariaLabel]="'CONSENT.SIGNATURE' | transloco" />
+
+<!-- After: the label is the accessible name -->
+<hub-signature [label]="'CONSENT.SIGNATURE' | transloco" />
+```
+
+Keep `[ariaLabel]` only on a surface with no visible label. There it is now translatable, resolving
+through `[labels]` / `provideHubSignature()`, then `HUBUI.SIGNATURE.ARIA_LABEL`, then the English
+fallback.
+
+**If you do nothing.** Names get *better*, not worse: a field whose `[label]` was translated and
+whose `[ariaLabel]` was not now announces the translated text. The only cost is a dead binding left
+in your templates.
+
+### `[ariaLabel]` defaults to `''` instead of `'Signature'`
+
+**What changed.** The input's default is the empty string, which is how the component tells "not
+set" from "set to the old default" before falling through to the dictionary.
+
+**Why.** With a hardcoded `'Signature'` default there was no way to distinguish a caller who wanted
+that exact literal from one who had never touched the input, so the translation chain could never
+run.
+
+**What you have to do.** Nothing, unless you read `signature.ariaLabel()` off a component instance
+and expected `'Signature'` back. The *rendered* name is unchanged: with nothing else supplying one,
+the fallback is still `Signature`.
+
+**If you do nothing.** No visible change. The type is still `string`.
+
+### `HubSignatureLabels` gained a required `ariaLabel`
+
+**What changed.** `HubSignatureLabels` and `HubSignatureResolvedLabels` now declare a fifth member,
+`ariaLabel`, holding the accessible name used when no visible label exists.
+
+**Why.** Same reason `keyboardHint` was added in 22.3.0: the text is user-facing, so it belongs in
+the localizable surface rather than hardcoded in the template. Its key is
+`HUBUI.SIGNATURE.ARIA_LABEL`.
+
+**What you have to do.** Nothing for overrides — `provideHubSignature({ labels: … })` and the
+`[labels]` input both take `Partial<HubSignatureLabels>`. Only code annotating a complete object
+breaks; type it as a partial, which is what the library consumes.
+
+**If you do nothing.** Overrides keep working. A fully annotated label object fails to compile.
+
 ## [22.3.0]
 
 ### `(drawStart)` and `(drawEnd)` emit `HubSignatureDrawEvent`, not `PointerEvent`

@@ -87,6 +87,9 @@ export class HubSignatureComponent extends HubFieldControl {
 	/** Links the surface to its keyboard instructions through `aria-describedby`. */
 	protected readonly keyboardHintId = `${this.id}-keyboard`;
 
+	/** Links the surface to its visible label through `aria-labelledby`. */
+	protected readonly labelId = `${this.id}-label`;
+
 	/**
 	 * Pen marker placement, as percentages of the surface.
 	 *
@@ -125,8 +128,15 @@ export class HubSignatureComponent extends HubFieldControl {
 	/** Shows the built-in clear / undo / redo action row. */
 	readonly controls = input(true, { transform: booleanAttribute });
 
-	/** Localizable accessible label for the drawing surface. */
-	readonly ariaLabel = input<string>('Signature');
+	/**
+	 * Accessible name for a surface with no visible {@link label}.
+	 *
+	 * A field that has a visible label takes its name from that label, so the two cannot
+	 * disagree and this input is not consulted. Left empty it resolves like every other piece of
+	 * text the component owns: through `[labels]`, then the application dictionary under
+	 * `HUBUI.SIGNATURE.ARIA_LABEL`, then the English fallback.
+	 */
+	readonly ariaLabel = input<string>('');
 
 	/** Per-instance overrides for the built-in action labels. */
 	readonly labels = input<Partial<HubSignatureLabels>>({});
@@ -151,6 +161,10 @@ export class HubSignatureComponent extends HubFieldControl {
 		effect((onCleanup) => {
 			this.translationSnapshot();
 			const labels = { ...this.config.labels, ...this.labels() };
+			// The dedicated input is the per-field shortcut into the same slot, so it replaces
+			// whatever the shared configuration holds — including a reactive source, which would
+			// otherwise overwrite the explicit value the moment it emitted.
+			if (this.ariaLabel()) labels.ariaLabel = this.ariaLabel();
 			this.actionLabels.set({
 				clear: this.getStaticLabel(labels.clear, 'HUBUI.SIGNATURE.ACTION.CLEAR', defaultHubSignatureLabels.clear),
 				undo: this.getStaticLabel(labels.undo, 'HUBUI.SIGNATURE.ACTION.UNDO', defaultHubSignatureLabels.undo),
@@ -159,6 +173,11 @@ export class HubSignatureComponent extends HubFieldControl {
 					labels.keyboardHint,
 					'HUBUI.SIGNATURE.KEYBOARD_HINT',
 					defaultHubSignatureLabels.keyboardHint
+				),
+				ariaLabel: this.getStaticLabel(
+					labels.ariaLabel,
+					'HUBUI.SIGNATURE.ARIA_LABEL',
+					defaultHubSignatureLabels.ariaLabel
 				)
 			});
 
@@ -277,6 +296,16 @@ export class HubSignatureComponent extends HubFieldControl {
 			event.preventDefault();
 			this.cancelStroke();
 		}
+	}
+
+	/**
+	 * Gives the drawing surface focus, which is what clicking a label is supposed to do.
+	 *
+	 * `<label for>` cannot deliver it: `for` associates only with labelable elements and a
+	 * `<canvas>` is not one, so the attribute would sit in the markup doing nothing.
+	 */
+	protected focusSurface(): void {
+		this.canvas().nativeElement.focus();
 	}
 
 	/** Parks the pen in the middle of the surface so a keyboard user can see where drawing starts. */

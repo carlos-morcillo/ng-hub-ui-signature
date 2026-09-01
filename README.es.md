@@ -84,6 +84,31 @@ lugar de usarlas para navegar por el documento. Ten en cuenta que una firma hech
 una polilínea, no escritura manual; decide de forma deliberada si eso sirve para aquello de lo que
 la firma es prueba.
 
+## Cómo se nombra el campo
+
+`[label]` es el nombre accesible. La superficie de dibujo se enlaza a él con `aria-labelledby`, así
+que el texto que lee una persona vidente y el que anuncia un lector de pantalla son el mismo nodo y
+no pueden separarse. Traducir `[label]` traduce el anuncio; no hay que enlazar nada dos veces. Al
+hacer clic en la etiqueta se enfoca la superficie.
+
+```html
+<hub-signature [label]="'CONSENT.SIGNATURE' | transloco" />
+```
+
+`[ariaLabel]` nombra una superficie **sin** etiqueta visible —un recuadro desnudo dentro de una
+maquetación que lo etiqueta de otro modo—. En un campo que sí tiene `[label]` no se consulta, así
+que no lo enlaces ahí. Vacío, se resuelve como las etiquetas de acción: `[labels]` /
+`provideHubSignature()`, luego `HUBUI.SIGNATURE.ARIA_LABEL`, y por último el respaldo en inglés
+`Signature`.
+
+```html
+<hub-signature [controls]="false" [ariaLabel]="'CONSENT.SIGNATURE' | transloco" />
+```
+
+No se usa `<label for>` a propósito: `for` solo asocia con elementos *labelable* —`button`, `input`,
+`meter`, `output`, `progress`, `select`, `textarea`— y un `<canvas>` no es ninguno, así que el
+atributo se quedaría en el marcado reclamando una asociación que el navegador nunca hace.
+
 ## Acciones traducibles
 
 El componente no depende de ningún sistema de traducción. Configura una vez el adaptador compartido de Hub UI durante el arranque; entrega el mismo diccionario a todas las bibliotecas compatibles, incluida Signature. Usa `labels` solo para una excepción de un campo:
