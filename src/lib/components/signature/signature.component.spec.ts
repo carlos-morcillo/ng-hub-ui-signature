@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { BehaviorSubject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideHubTranslationAdapter } from 'ng-hub-ui-utils';
+import type { HubSignatureDrawEvent } from '../../models/signature.types';
 import { HUB_SIGNATURE_CONFIG, type HubSignatureLabels } from '../../signature-config';
 import { HubSignatureComponent } from './signature.component';
 
@@ -12,6 +13,9 @@ import { HubSignatureComponent } from './signature.component';
 	template: `<hub-signature
 		[labels]="signatureLabels()"
 		[readonly]="readonlyMode()"
+		[strokeColor]="ink()"
+		[showValid]="true"
+		[validFeedback]="validMessage()"
 		(drawStart)="starts.push($event)"
 		(drawEnd)="ends.push($event)"
 	/>`
@@ -20,8 +24,10 @@ class HostSignatureComponent {
 	readonly signature = viewChild.required(HubSignatureComponent);
 	readonly signatureLabels = signal<Partial<HubSignatureLabels>>({});
 	readonly readonlyMode = signal(false);
-	readonly starts: PointerEvent[] = [];
-	readonly ends: PointerEvent[] = [];
+	readonly ink = signal('currentColor');
+	readonly validMessage = signal<string | null>(null);
+	readonly starts: HubSignatureDrawEvent[] = [];
+	readonly ends: HubSignatureDrawEvent[] = [];
 }
 
 /** Minimal PointerEvent stand-in: jsdom has no pointer capture. */
@@ -29,13 +35,26 @@ function pointerEvent(id = 1): PointerEvent {
 	return { pointerId: id, preventDefault: () => {}, clientX: 10, clientY: 10 } as unknown as PointerEvent;
 }
 
+/** Drives the real template binding rather than the handler, so the wiring is under test too. */
+function keydown(canvas: HTMLCanvasElement, key: string, init: KeyboardEventInit = {}): void {
+	canvas.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }));
+}
+
+/** Focuses the surface and returns it, which is where every keyboard interaction begins. */
+function focusedCanvas(fixture: { nativeElement: HTMLElement }): HTMLCanvasElement {
+	const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+	canvas.focus();
+	return canvas;
+}
+
 describe('HubSignatureComponent', () => {
 	beforeEach(() => {
 		TestBed.configureTestingModule({ imports: [HostSignatureComponent] });
 		vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-		// jsdom implements neither pointer-capture method.
+		// jsdom implements none of the pointer-capture methods.
 		HTMLCanvasElement.prototype.setPointerCapture = () => {};
 		HTMLCanvasElement.prototype.releasePointerCapture = () => {};
+		HTMLCanvasElement.prototype.hasPointerCapture = () => true;
 	});
 
 	it('restores a form SVG value as drawable signature data', () => {
@@ -211,5 +230,149 @@ describe('HubSignatureComponent', () => {
 		fixture.componentInstance.signature().startStroke(pointerEvent());
 
 		expect(fixture.componentInstance.starts).toHaveLength(0);
+	});
+
+	it('draws a committed stroke from the keyboard alone', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+		const canvas = focusedCanvas(fixture);
+		const signature = fixture.componentInstance.signature();
+
+		keydown(canvas, ' ');
+		keydown(canvas, 'ArrowRight');
+		keydown(canvas, 'ArrowDown');
+		keydown(canvas, ' ');
+
+		const [stroke, ...rest] = signature.toStrokes();
+		expect(rest).toHaveLength(0);
+		expect(stroke.points).toHaveLength(3);
+		// Same shape a pointer stroke produces: 0.5 is the pressure fallback of getPoint().
+		expect(stroke.points.every((point) => point.pressure === 0.5)).toBe(true);
+		expect(signature.toSvg()).toContain('<path d="M ');
+		expect(signature.isEmpty()).toBe(false);
+	});
+
+	it('emits drawStart and drawEnd around a keyboard stroke', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+		const canvas = focusedCanvas(fixture);
+		const host = fixture.componentInstance;
+
+		keydown(canvas, 'Enter');
+		expect(host.starts).toHaveLength(1);
+		expect(host.starts[0]).toBeInstanceOf(KeyboardEvent);
+		expect(host.ends).toHaveLength(0);
+
+		keydown(canvas, 'Enter');
+		expect(host.ends).toHaveLength(1);
+		expect(host.ends[0]).toBeInstanceOf(KeyboardEvent);
+	});
+
+	it('refuses the keyboard drawing path while readonly', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.readonlyMode.set(true);
+		fixture.detectChanges();
+		const canvas = focusedCanvas(fixture);
+
+		keydown(canvas, ' ');
+		keydown(canvas, 'ArrowRight');
+		keydown(canvas, ' ');
+
+		expect(fixture.componentInstance.starts).toHaveLength(0);
+		expect(fixture.componentInstance.signature().isEmpty()).toBe(true);
+	});
+
+	it('describes the keyboard interaction through aria-describedby', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+		const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+
+		const describedBy = canvas.getAttribute('aria-describedby');
+		const hint = fixture.nativeElement.querySelector(`[id="${describedBy}"]`) as HTMLElement | null;
+
+		expect(describedBy).toBeTruthy();
+		expect(hint?.textContent).toMatch(/arrow keys/i);
+	});
+
+	it('shows the keyboard pen once the surface is focused', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+
+		focusedCanvas(fixture);
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('.hub-signature__caret')).not.toBeNull();
+	});
+
+	it('discards the keyboard stroke in progress when Escape is pressed', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		const onChange = vi.fn();
+		fixture.detectChanges();
+		const signature = fixture.componentInstance.signature();
+		signature.registerOnChange(onChange);
+		const canvas = focusedCanvas(fixture);
+
+		keydown(canvas, ' ');
+		keydown(canvas, 'ArrowRight');
+		keydown(canvas, 'Escape');
+
+		// The stroke really began, so an empty field proves it was discarded and not merely never started.
+		expect(fixture.componentInstance.starts).toHaveLength(1);
+		expect(signature.isEmpty()).toBe(true);
+		expect(fixture.componentInstance.ends).toHaveLength(0);
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('discards the stroke in progress when the pointer is cancelled', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		const onChange = vi.fn();
+		fixture.detectChanges();
+		const signature = fixture.componentInstance.signature();
+		signature.registerOnChange(onChange);
+		const canvas = fixture.nativeElement.querySelector('canvas') as HTMLCanvasElement;
+
+		signature.startStroke(pointerEvent());
+		canvas.dispatchEvent(new Event('pointercancel'));
+
+		expect(signature.isEmpty()).toBe(true);
+		expect(fixture.componentInstance.ends).toHaveLength(0);
+		expect(onChange).not.toHaveBeenCalled();
+	});
+
+	it('resolves the default currentColor ink before storing it', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.detectChanges();
+		const signature = fixture.componentInstance.signature();
+
+		signature.startStroke(pointerEvent());
+		signature.finishStroke(pointerEvent());
+
+		expect(signature.toStrokes()[0].color).not.toBe('currentColor');
+		expect(signature.toSvg()).not.toContain('currentColor');
+	});
+
+	it('stores an explicitly bound stroke colour verbatim', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.ink.set('#123456');
+		fixture.detectChanges();
+		const signature = fixture.componentInstance.signature();
+
+		signature.startStroke(pointerEvent());
+		signature.finishStroke(pointerEvent());
+
+		expect(signature.toStrokes()[0].color).toBe('#123456');
+	});
+
+	it('renders the success feedback once the field is touched and valid', () => {
+		const fixture = TestBed.createComponent(HostSignatureComponent);
+		fixture.componentInstance.validMessage.set('Signature captured');
+		fixture.detectChanges();
+
+		fixture.componentInstance.signature().handleBlur();
+		fixture.detectChanges();
+
+		expect(fixture.nativeElement.querySelector('.hub-field__feedback--valid')?.textContent.trim()).toBe(
+			'Signature captured'
+		);
 	});
 });

@@ -1,6 +1,10 @@
 # ng-hub-ui-signature
 
-SVG-backed signature field for Angular forms. It records mouse, touch and pen input through Pointer Events, stores a scalable SVG in the form model and can export the rendered canvas as PNG.
+SVG-backed signature field for Angular forms. It records mouse, touch and pen input through Pointer Events — or arrow keys and Space, for signing without a pointer — stores a scalable SVG in the form model and can export the rendered canvas as PNG.
+
+## Migrating from angular2-signaturepad
+
+`angular2-signaturepad` last published in February 2022. **[Read the migration guide](./MIGRATION.md)** — it maps the full API, shows working code, and states plainly what does not carry over: signatures stored as PNG data URLs cannot be reloaded for editing, and the visible `<label>` is not programmatically associated with the canvas.
 
 ## Install
 
@@ -50,12 +54,34 @@ payload would let a migration compile and then fail silently wherever the value 
 | Output | Payload | Emitted |
 | --- | --- | --- |
 | `valueChange` | `string` | After a user-originated change, carrying the SVG |
-| `drawStart` | `PointerEvent` | When a stroke begins |
-| `drawEnd` | `PointerEvent` | When a stroke is finished and committed |
+| `drawStart` | `HubSignatureDrawEvent` | When a stroke begins |
+| `drawEnd` | `HubSignatureDrawEvent` | When a stroke is finished and committed |
 
 `drawStart` and `drawEnd` let a host react to drawing activity — pausing an autosave, arming a submit
 button — without polling the value. They fire for user drawing only, so a programmatic write never
-looks like one.
+looks like one, and a stroke that was cancelled rather than finished emits no `drawEnd` at all.
+
+`HubSignatureDrawEvent` is `PointerEvent | KeyboardEvent`, because a stroke can be written either
+way. Narrow with `instanceof` when the input device matters.
+
+## Signing with the keyboard
+
+The field is operable without a pointer. With the surface focused:
+
+| Keys | Effect |
+| --- | --- |
+| Arrow keys | Move the pen; hold Shift for a coarser step |
+| Space or Enter | Lower the pen, and lower it again to lift and commit the stroke |
+| Escape | Discard the stroke in progress |
+
+The resulting stroke is an ordinary one: same `HubSignatureStroke`, same `toSvg()` output, same
+reported value, same `drawStart` / `drawEnd`. It obeys `readonly` and `disabled` like the pointer
+path, and the instructions are announced to assistive technology through `aria-describedby` —
+translate them under `HUBUI.SIGNATURE.KEYBOARD_HINT`.
+
+The canvas carries `role="application"` so screen readers hand it the arrow keys instead of using
+them to navigate the document. Bear in mind that a keyboard signature is a polyline, not
+handwriting; decide deliberately whether that satisfies what your signature is evidence of.
 
 ## Localized actions
 

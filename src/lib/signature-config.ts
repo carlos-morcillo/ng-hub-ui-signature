@@ -9,11 +9,16 @@ export interface HubSignatureLabelSource {
 /** A static label or a reactive source such as Transloco's or ngx-translate's stream. */
 export type HubSignatureLabel = string | HubSignatureLabelSource;
 
-/** Localizable labels used by the built-in signature actions. */
+/** Localizable text used by the built-in signature actions and the keyboard instructions. */
 export interface HubSignatureLabels {
 	clear: HubSignatureLabel;
 	undo: HubSignatureLabel;
 	redo: HubSignatureLabel;
+	/**
+	 * How to sign without a pointer, read out by assistive technology on focus.
+	 * Rewrite it, do not merely translate it, if the surrounding application renames those keys.
+	 */
+	keyboardHint: HubSignatureLabel;
 }
 
 /** Concrete text rendered after resolving reactive labels. */
@@ -21,6 +26,7 @@ export interface HubSignatureResolvedLabels {
 	clear: string;
 	undo: string;
 	redo: string;
+	keyboardHint: string;
 }
 
 /** Global options shared by every signature field. */
@@ -37,7 +43,9 @@ export interface HubSignatureConfigOverride {
 export const defaultHubSignatureLabels: HubSignatureLabels & HubSignatureResolvedLabels = {
 	clear: 'Clear signature',
 	undo: 'Undo stroke',
-	redo: 'Redo stroke'
+	redo: 'Redo stroke',
+	keyboardHint:
+		'Sign with the keyboard: arrow keys move the pen, holding Shift moves it further, Space or Enter lowers and lifts it, and Escape discards the stroke in progress.'
 };
 
 /** Default signature configuration. */

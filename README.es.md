@@ -2,7 +2,7 @@
 
 [English](./README.md) | **Español**
 
-Campo de firma para formularios Angular respaldado por SVG. Registra ratón, táctil y lápiz mediante Pointer Events, guarda un SVG escalable en el modelo del formulario y puede exportar el lienzo a PNG.
+Campo de firma para formularios Angular respaldado por SVG. Registra ratón, táctil y lápiz mediante Pointer Events —o flechas y Espacio, para firmar sin puntero—, guarda un SVG escalable en el modelo del formulario y puede exportar el lienzo a PNG.
 
 ## Instalación
 
@@ -53,12 +53,36 @@ allí donde el valor esté tipado como `any`.
 | Salida | Carga | Se emite |
 | --- | --- | --- |
 | `valueChange` | `string` | Tras un cambio del usuario, con el SVG |
-| `drawStart` | `PointerEvent` | Al empezar un trazo |
-| `drawEnd` | `PointerEvent` | Al terminar y consolidar un trazo |
+| `drawStart` | `HubSignatureDrawEvent` | Al empezar un trazo |
+| `drawEnd` | `HubSignatureDrawEvent` | Al terminar y consolidar un trazo |
 
 `drawStart` y `drawEnd` permiten al anfitrión reaccionar a la actividad de dibujo —pausar un
 autoguardado, armar un botón de envío— sin sondear el valor. Solo se emiten para el dibujo del
-usuario, así que una escritura por código nunca parece una.
+usuario, así que una escritura por código nunca parece una, y un trazo cancelado en vez de
+terminado no emite `drawEnd`.
+
+`HubSignatureDrawEvent` es `PointerEvent | KeyboardEvent`, porque un trazo puede escribirse de
+cualquiera de las dos formas. Usa `instanceof` para estrechar el tipo cuando importe el dispositivo.
+
+## Firmar con el teclado
+
+El campo se puede usar sin puntero. Con la superficie enfocada:
+
+| Teclas | Efecto |
+| --- | --- |
+| Flechas | Mueven el lápiz; con Shift, a paso más largo |
+| Espacio o Enter | Bajan el lápiz, y al pulsarlas de nuevo lo levantan y consolidan el trazo |
+| Escape | Descarta el trazo en curso |
+
+El trazo resultante es uno normal: mismo `HubSignatureStroke`, mismo `toSvg()`, mismo valor
+reportado, mismos `drawStart` / `drawEnd`. Respeta `readonly` y `disabled` igual que la ruta de
+puntero, y las instrucciones se anuncian a los lectores de pantalla mediante `aria-describedby`
+—tradúcelas bajo `HUBUI.SIGNATURE.KEYBOARD_HINT`.
+
+El lienzo lleva `role="application"` para que los lectores de pantalla le entreguen las flechas en
+lugar de usarlas para navegar por el documento. Ten en cuenta que una firma hecha con el teclado es
+una polilínea, no escritura manual; decide de forma deliberada si eso sirve para aquello de lo que
+la firma es prueba.
 
 ## Acciones traducibles
 

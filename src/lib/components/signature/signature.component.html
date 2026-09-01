@@ -14,21 +14,46 @@
 		</label>
 	}
 
-	<canvas
-		#canvas
-		[id]="id"
-		class="hub-signature__canvas"
-		tabindex="0"
-		[attr.aria-label]="ariaLabel()"
-		[attr.aria-required]="required() ? 'true' : null"
-		[attr.aria-invalid]="isInvalid"
-		[attr.aria-readonly]="readonly() ? 'true' : null"
-		[attr.aria-disabled]="disabled() ? 'true' : null"
-		(pointerdown)="startStroke($event)"
-		(pointermove)="moveStroke($event)"
-		(pointerup)="finishStroke($event)"
-		(pointercancel)="finishStroke($event)"
-	></canvas>
+	<!--
+		role="application" is deliberate and load-bearing. Arrow keys ARE the keyboard drawing
+		interaction, and a canvas with tabindex is not a form control, so NVDA and JAWS stay in
+		browse mode over it and consume the arrows for document navigation. Without the role the
+		keyboard path exists in code and never reaches the users it is for.
+	-->
+	<div class="hub-signature__surface">
+		<canvas
+			#canvas
+			[id]="id"
+			class="hub-signature__canvas"
+			tabindex="0"
+			role="application"
+			[attr.aria-label]="ariaLabel()"
+			[attr.aria-describedby]="keyboardHintId"
+			[attr.aria-required]="required() ? 'true' : null"
+			[attr.aria-invalid]="isInvalid"
+			[attr.aria-readonly]="readonly() ? 'true' : null"
+			[attr.aria-disabled]="disabled() ? 'true' : null"
+			(pointerdown)="startStroke($event)"
+			(pointermove)="moveStroke($event)"
+			(pointerup)="finishStroke($event)"
+			(pointercancel)="cancelStroke($event)"
+			(keydown)="handleKeydown($event)"
+			(focus)="showCaret()"
+			(blur)="cancelStroke()"
+		></canvas>
+
+		@if (caretMarker(); as pen) {
+			<span
+				class="hub-signature__caret"
+				[class.hub-signature__caret--down]="penDown()"
+				[style.left.%]="pen.left"
+				[style.top.%]="pen.top"
+				aria-hidden="true"
+			></span>
+		}
+	</div>
+
+	<p [id]="keyboardHintId" class="hub-signature__instructions">{{ actionLabels().keyboardHint }}</p>
 
 	@if (controls()) {
 		<div class="hub-signature__actions">
@@ -57,6 +82,12 @@
 					</li>
 				}
 			</ul>
+		</div>
+	}
+
+	@if (showsValid && validFeedback()) {
+		<div class="hub-field__feedback hub-field__feedback--valid" role="status">
+			<span class="hub-field__feedback-text">{{ validFeedback() }}</span>
 		</div>
 	}
 </div>

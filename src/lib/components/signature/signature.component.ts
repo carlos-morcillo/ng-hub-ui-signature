@@ -3,6 +3,7 @@ import {
 	booleanAttribute,
 	ChangeDetectionStrategy,
 	Component,
+	computed,
 	effect,
 	ElementRef,
 	inject,
@@ -18,7 +19,7 @@ import { KeyValuePipe } from '@angular/common';
 import { HubLabelType, HubLabelTypes } from 'ng-hub-ui-forms';
 import { HubFieldControl } from 'ng-hub-ui-forms';
 import { HubTranslationService } from 'ng-hub-ui-utils';
-import { HubSignaturePoint, HubSignatureStroke } from '../../models/signature.types';
+import { HubSignatureDrawEvent, HubSignaturePoint, HubSignatureStroke } from '../../models/signature.types';
 import { parseHubSignature } from '../../utils/parse-signature-svg';
 import { serializeHubSignature } from '../../utils/signature-svg';
 import {
@@ -30,9 +31,31 @@ import {
 	HubSignatureResolvedLabels
 } from '../../signature-config';
 
+/** Where each arrow key carries the keyboard pen. */
+const CARET_DIRECTIONS: Record<string, { x: number; y: number }> = {
+	ArrowUp: { x: 0, y: -1 },
+	ArrowDown: { x: 0, y: 1 },
+	ArrowLeft: { x: -1, y: 0 },
+	ArrowRight: { x: 1, y: 0 }
+};
+
+/** Pen travel per arrow press, in logical pixels. */
+const CARET_STEP = 4;
+
+/** Travel while Shift is held, so crossing the surface does not take fifty presses. */
+const CARET_COARSE_STEP = 20;
+
+/** Pressure reported for points no device sampled, matching the fallback of `getPoint()`. */
+const SYNTHETIC_PRESSURE = 0.5;
+
+/** Keeps the keyboard pen inside the drawing surface. */
+function clamp(value: number, min: number, max: number): number {
+	return Math.min(Math.max(value, min), max);
+}
+
 /**
  * Freehand-signature form field whose value is a portable SVG document.
- * Pointer coordinates are retained independently from canvas pixels so DPR and
+ * Drawing coordinates are retained independently from canvas pixels so DPR and
  * responsive resizes never alter the signed stroke geometry.
  */
 @Component({
@@ -56,7 +79,27 @@ export class HubSignatureComponent extends HubFieldControl {
 	private readonly strokes = signal<HubSignatureStroke[]>([]);
 	private readonly redoStrokes = signal<HubSignatureStroke[]>([]);
 	private readonly drawingStroke = signal<HubSignatureStroke | null>(null);
-	private logicalWidth = 320;
+	private readonly logicalWidth = signal(320);
+
+	/** Keyboard pen position in logical coordinates; null until the surface is first focused. */
+	private readonly caret = signal<{ x: number; y: number } | null>(null);
+
+	/** Links the surface to its keyboard instructions through `aria-describedby`. */
+	protected readonly keyboardHintId = `${this.id}-keyboard`;
+
+	/**
+	 * Pen marker placement, as percentages of the surface.
+	 *
+	 * Drawn as a DOM element rather than onto the canvas on purpose: the bitmap is what
+	 * `toDataUrl()` exports, and a cursor has no business ending up in an exported signature.
+	 */
+	protected readonly caretMarker = computed(() => {
+		const caret = this.caret();
+		return caret && { left: (caret.x / this.logicalWidth()) * 100, top: (caret.y / this.height()) * 100 };
+	});
+
+	/** Whether a stroke is being written, which the pen marker reflects. */
+	protected readonly penDown = computed(() => this.drawingStroke() !== null);
 
 	/** Label text rendered with the same contract as the other form fields. */
 	readonly label = input<string>('');
@@ -98,10 +141,10 @@ export class HubSignatureComponent extends HubFieldControl {
 	readonly valueChange = output<string>();
 
 	/** Emits when the user starts a stroke, before any point is committed. */
-	readonly drawStart = output<PointerEvent>();
+	readonly drawStart = output<HubSignatureDrawEvent>();
 
-	/** Emits when the user lifts the pointer and the stroke has been committed. */
-	readonly drawEnd = output<PointerEvent>();
+	/** Emits when the user ends a stroke and it has been committed; a cancelled stroke never emits. */
+	readonly drawEnd = output<HubSignatureDrawEvent>();
 
 	constructor() {
 		super();
@@ -111,7 +154,12 @@ export class HubSignatureComponent extends HubFieldControl {
 			this.actionLabels.set({
 				clear: this.getStaticLabel(labels.clear, 'HUBUI.SIGNATURE.ACTION.CLEAR', defaultHubSignatureLabels.clear),
 				undo: this.getStaticLabel(labels.undo, 'HUBUI.SIGNATURE.ACTION.UNDO', defaultHubSignatureLabels.undo),
-				redo: this.getStaticLabel(labels.redo, 'HUBUI.SIGNATURE.ACTION.REDO', defaultHubSignatureLabels.redo)
+				redo: this.getStaticLabel(labels.redo, 'HUBUI.SIGNATURE.ACTION.REDO', defaultHubSignatureLabels.redo),
+				keyboardHint: this.getStaticLabel(
+					labels.keyboardHint,
+					'HUBUI.SIGNATURE.KEYBOARD_HINT',
+					defaultHubSignatureLabels.keyboardHint
+				)
 			});
 
 			const subscriptions = (
@@ -151,12 +199,8 @@ export class HubSignatureComponent extends HubFieldControl {
 	startStroke(event: PointerEvent): void {
 		if (this.disabled() || this.readonly()) return;
 		event.preventDefault();
-		const canvas = this.canvas().nativeElement;
-		canvas.setPointerCapture(event.pointerId);
-		const point = this.getPoint(event);
-		this.drawingStroke.set({ points: [point], color: this.strokeColor(), width: this.strokeWidth() });
-		this.redraw();
-		this.drawStart.emit(event);
+		this.canvas().nativeElement.setPointerCapture(event.pointerId);
+		this.beginStroke(this.getPoint(event), event);
 	}
 
 	/** Extends the active stroke and paints an immediate visual preview. */
@@ -168,19 +212,77 @@ export class HubSignatureComponent extends HubFieldControl {
 		this.redraw();
 	}
 
-	/** Commits the active stroke only when it contains a visible mark. */
+	/** Commits the active stroke when the pointer is lifted. */
 	finishStroke(event: PointerEvent): void {
-		const stroke = this.drawingStroke();
-		if (!stroke) return;
-		this.canvas().nativeElement.releasePointerCapture(event.pointerId);
+		if (!this.drawingStroke()) return;
+		this.releaseCapture(event);
+		this.commitStroke(event);
+	}
+
+	/**
+	 * Throws away the stroke in progress without reporting it.
+	 *
+	 * `pointercancel` means the interaction did not happen — an OS gesture took over, a scroll
+	 * claimed the pointer, palm rejection fired — so treating it as a pen-up would commit a
+	 * partial mark to the form value that the user never intended to make. Also the path taken
+	 * when the keyboard user presses Escape, or focus leaves the surface mid-stroke.
+	 *
+	 * @param event - The originating pointer event, when the cancellation came from a pointer.
+	 */
+	cancelStroke(event?: PointerEvent): void {
+		if (!this.drawingStroke()) return;
+		if (event) this.releaseCapture(event);
 		this.drawingStroke.set(null);
-		if (stroke.points.length === 1) {
-			stroke.points.push({ ...stroke.points[0], x: stroke.points[0].x + 0.01 });
+		this.redraw();
+	}
+
+	/**
+	 * Drives the keyboard drawing path.
+	 *
+	 * Arrows carry the pen, Space and Enter lower and lift it, Escape abandons the stroke.
+	 * The gesture is deliberately modal rather than "hold a key to draw": a key repeat is
+	 * throttled by the operating system, so a held-key design would sample points at an
+	 * unpredictable rate, and holding one key while pressing another is beyond many of the
+	 * motor abilities this path exists to serve.
+	 *
+	 * Chords carrying a modifier other than Shift are left to the browser so application and
+	 * assistive-technology shortcuts keep working over the field.
+	 *
+	 * @param event - The originating keyboard event.
+	 */
+	protected handleKeydown(event: KeyboardEvent): void {
+		if (this.disabled() || this.readonly() || event.altKey || event.ctrlKey || event.metaKey) return;
+
+		if (CARET_DIRECTIONS[event.key]) {
+			event.preventDefault();
+			this.moveCaret(event);
+			return;
 		}
-		this.strokes.update((strokes) => [...strokes, stroke]);
-		this.redoStrokes.set([]);
-		this.notifyValueChange();
-		this.drawEnd.emit(event);
+
+		if (event.key === ' ' || event.key === 'Enter') {
+			event.preventDefault();
+			if (this.drawingStroke()) {
+				this.commitStroke(event);
+				return;
+			}
+			const pen = this.penPosition();
+			this.caret.set(pen);
+			this.beginStroke({ ...pen, pressure: SYNTHETIC_PRESSURE }, event);
+			return;
+		}
+
+		if (event.key === 'Escape') {
+			// Only claim the key when there is something to abandon; a dialog above may want it.
+			if (!this.drawingStroke()) return;
+			event.preventDefault();
+			this.cancelStroke();
+		}
+	}
+
+	/** Parks the pen in the middle of the surface so a keyboard user can see where drawing starts. */
+	protected showCaret(): void {
+		if (this.disabled() || this.readonly()) return;
+		this.caret.set(this.penPosition());
 	}
 
 	/** Removes every stroke and propagates the empty form value. */
@@ -260,7 +362,7 @@ export class HubSignatureComponent extends HubFieldControl {
 
 	/** Returns a lossless, scalable serialization suitable for form persistence. */
 	toSvg(): string {
-		return serializeHubSignature(this.strokes(), this.logicalWidth, this.height());
+		return serializeHubSignature(this.strokes(), this.logicalWidth(), this.height());
 	}
 
 	/** Exports the current canvas bitmap in a browser-supported image format. */
@@ -272,12 +374,96 @@ export class HubSignatureComponent extends HubFieldControl {
 	resizeCanvas(): void {
 		const canvas = this.canvas().nativeElement;
 		const rect = canvas.getBoundingClientRect();
-		this.logicalWidth = Math.max(1, Math.round(rect.width || this.logicalWidth));
+		this.logicalWidth.set(Math.max(1, Math.round(rect.width || this.logicalWidth())));
 		const scale = globalThis.devicePixelRatio || 1;
-		canvas.width = this.logicalWidth * scale;
+		canvas.width = this.logicalWidth() * scale;
 		canvas.height = this.height() * scale;
 		canvas.style.height = `${this.height()}px`;
 		this.redraw();
+	}
+
+	/**
+	 * Opens a stroke, whatever produced the first point.
+	 *
+	 * Pointer and keyboard share this so a signed stroke carries no trace of the device that
+	 * wrote it: same `HubSignatureStroke`, same serialization, same reported value.
+	 *
+	 * @param point - First point of the stroke, in logical coordinates.
+	 * @param event - The interaction that opened it, forwarded to `drawStart`.
+	 */
+	private beginStroke(point: HubSignaturePoint, event: HubSignatureDrawEvent): void {
+		this.drawingStroke.set({ points: [point], color: this.resolveStrokeColor(), width: this.strokeWidth() });
+		this.redraw();
+		this.drawStart.emit(event);
+	}
+
+	/**
+	 * Commits the stroke in progress and reports the new value.
+	 *
+	 * A single-point stroke is padded rather than dropped, so a deliberate dot still leaves a
+	 * mark — which also means a stray tap counts as a signature. Validate beyond `required` if
+	 * the field is a legal gate.
+	 *
+	 * @param event - The interaction that closed it, forwarded to `drawEnd`.
+	 */
+	private commitStroke(event: HubSignatureDrawEvent): void {
+		const stroke = this.drawingStroke()!;
+		this.drawingStroke.set(null);
+		if (stroke.points.length === 1) {
+			stroke.points.push({ ...stroke.points[0], x: stroke.points[0].x + 0.01 });
+		}
+		this.strokes.update((strokes) => [...strokes, stroke]);
+		this.redoStrokes.set([]);
+		this.notifyValueChange();
+		this.drawEnd.emit(event);
+	}
+
+	/** Current pen position, defaulting to the centre of the surface. */
+	private penPosition(): { x: number; y: number } {
+		return this.caret() ?? { x: this.logicalWidth() / 2, y: this.height() / 2 };
+	}
+
+	/**
+	 * Moves the pen, extending the stroke when it is down so travel and drawing are one gesture.
+	 *
+	 * @param event - The arrow keypress; Shift selects the coarse step.
+	 */
+	private moveCaret(event: KeyboardEvent): void {
+		const direction = CARET_DIRECTIONS[event.key];
+		const step = event.shiftKey ? CARET_COARSE_STEP : CARET_STEP;
+		const from = this.penPosition();
+		const to = {
+			x: clamp(from.x + direction.x * step, 0, this.logicalWidth()),
+			y: clamp(from.y + direction.y * step, 0, this.height())
+		};
+		this.caret.set(to);
+
+		const stroke = this.drawingStroke();
+		if (!stroke) return;
+		this.drawingStroke.set({ ...stroke, points: [...stroke.points, { ...to, pressure: SYNTHETIC_PRESSURE }] });
+		this.redraw();
+	}
+
+	/**
+	 * Resolves the ink actually used, so `currentColor` never reaches the canvas or the archive.
+	 *
+	 * The 2D context cannot parse CSS-context keywords — the assignment is dropped and the ink
+	 * falls back to black — and the same string is written verbatim into the stored SVG, leaving
+	 * an archived signature with no fixed colour at all. Resolving it here is also what makes
+	 * `hub-signature-theme($color: …)` reach the ink, as its documentation claims.
+	 *
+	 * @returns A concrete colour to store on the stroke.
+	 */
+	private resolveStrokeColor(): string {
+		const color = this.strokeColor();
+		if (color.trim().toLowerCase() !== 'currentcolor') return color;
+		return getComputedStyle(this.canvas().nativeElement).color || '#000000';
+	}
+
+	/** Releases pointer capture only when this element still holds it, as cancellation may have. */
+	private releaseCapture(event: PointerEvent): void {
+		const canvas = this.canvas().nativeElement;
+		if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
 	}
 
 	/** Emits only user changes; model writes must never re-enter Angular forms. */
@@ -292,7 +478,7 @@ export class HubSignatureComponent extends HubFieldControl {
 	private getPoint(event: PointerEvent): HubSignaturePoint {
 		const rect = this.canvas().nativeElement.getBoundingClientRect();
 		return {
-			x: ((event.clientX - rect.left) * this.logicalWidth) / Math.max(1, rect.width),
+			x: ((event.clientX - rect.left) * this.logicalWidth()) / Math.max(1, rect.width),
 			y: ((event.clientY - rect.top) * this.height()) / Math.max(1, rect.height),
 			pressure: event.pressure || 0.5
 		};
@@ -305,7 +491,7 @@ export class HubSignatureComponent extends HubFieldControl {
 		if (!canvas || !context) return;
 		const scale = globalThis.devicePixelRatio || 1;
 		context.setTransform(scale, 0, 0, scale, 0, 0);
-		context.clearRect(0, 0, this.logicalWidth, this.height());
+		context.clearRect(0, 0, this.logicalWidth(), this.height());
 		[...this.strokes(), ...(this.drawingStroke() ? [this.drawingStroke()!] : [])].forEach((stroke) => {
 			context.beginPath();
 			context.strokeStyle = stroke.color;

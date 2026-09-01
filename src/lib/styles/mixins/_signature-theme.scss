@@ -1,3 +1,6 @@
+@use 'sass:list';
+@use 'sass:map';
+
 // ─────────────────────────────────────────────────────────────────────────
 // hub-signature-theme — one-call theming for `<hub-signature>`
 // ─────────────────────────────────────────────────────────────────────────
@@ -5,7 +8,10 @@
 // Override the `--hub-signature-*` design tokens in a single include, without
 // coupling the consumer to the component's DOM. Every parameter is OPTIONAL
 // and defaults to `null`: only the parameters you pass are emitted, so the
-// tokens you leave alone keep resolving through their own defaults.
+// tokens you leave alone keep resolving through their own defaults. An include
+// with no arguments would therefore emit nothing at all, which reads as a
+// broken build rather than as a no-op — so it raises a `@warn` instead of
+// failing silently.
 // Token-based and self-contained (no Bootstrap dependencies).
 //
 // The field's tokens default to the `ng-hub-ui-forms` field contract —
@@ -14,11 +20,14 @@
 // signature field too; reach for this mixin when the signature has to depart
 // from the inputs around it, not to make it match them.
 //
-// The five parameters cover the drawing surface, the text colour, the border
-// and its radius, and the border colour on focus. `$color` also carries the
-// ink, because the stroke defaults to `currentColor`. The remaining
-// `--hub-signature-*` tokens — border width, focus shadow, label colour and
-// size, font size, action gap — are set as custom properties directly.
+// The eleven parameters cover every `--hub-signature-*` token the component
+// declares. `$color` also carries the ink, because the stroke defaults to
+// `currentColor` and the component resolves that against the surface before
+// capturing a stroke.
+//
+// The six parameters added in 22.3.0 are appended after the original five
+// rather than grouped by meaning, so that existing positional includes keep
+// resolving to the same tokens.
 //
 // @example
 //
@@ -30,7 +39,9 @@
 //       $color: rgba(255, 255, 255, 0.92),
 //       $border-color: rgba(255, 255, 255, 0.24),
 //       $border-radius: 12px,
-//       $focus-border-color: #7dd3fc
+//       $focus-border-color: #7dd3fc,
+//       $focus-shadow: 0 0 0 0.25rem rgb(125 211 252 / 35%),
+//       $label-color: rgba(255, 255, 255, 0.72)
 //     );
 //   }
 //
@@ -40,23 +51,45 @@
 	$color: null,
 	$border-color: null,
 	$border-radius: null,
-	$focus-border-color: null
+	$focus-border-color: null,
+	$border-width: null,
+	$focus-shadow: null,
+	$font-size: null,
+	$label-color: null,
+	$label-font-size: null,
+	$actions-gap: null
 ) {
-	:where(.hub-signature) {
-		@if $background != null {
-			--hub-signature-bg: #{$background};
+	$tokens: (
+		'--hub-signature-bg': $background,
+		'--hub-signature-color': $color,
+		'--hub-signature-border-color': $border-color,
+		'--hub-signature-border-radius': $border-radius,
+		'--hub-signature-focus-border-color': $focus-border-color,
+		'--hub-signature-border-width': $border-width,
+		'--hub-signature-focus-shadow': $focus-shadow,
+		'--hub-signature-font-size': $font-size,
+		'--hub-signature-label-color': $label-color,
+		'--hub-signature-label-font-size': $label-font-size,
+		'--hub-signature-actions-gap': $actions-gap
+	);
+
+	$requested: ();
+
+	@each $token, $value in $tokens {
+		@if $value != null {
+			$requested: list.append($requested, $token);
 		}
-		@if $color != null {
-			--hub-signature-color: #{$color};
-		}
-		@if $border-color != null {
-			--hub-signature-border-color: #{$border-color};
-		}
-		@if $border-radius != null {
-			--hub-signature-border-radius: #{$border-radius};
-		}
-		@if $focus-border-color != null {
-			--hub-signature-focus-border-color: #{$focus-border-color};
+	}
+
+	@if list.length($requested) == 0 {
+		@warn 'hub-signature-theme() was included with no arguments, so it emits nothing. Pass at least one of: #{map.keys($tokens)}.';
+	} @else {
+		:where(.hub-signature) {
+			@each $token, $value in $tokens {
+				@if $value != null {
+					#{$token}: #{$value};
+				}
+			}
 		}
 	}
 }
