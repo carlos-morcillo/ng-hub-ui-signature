@@ -6,7 +6,7 @@ This file documents breaking changes and migration steps for `ng-hub-ui-signatur
 > compatibility. A breaking change therefore ships as a **minor**, and this file is the only warning
 > you get — read it before upgrading within a major line.
 
-## [Unreleased]
+## [22.3.0]
 
 ### `(drawStart)` and `(drawEnd)` emit `HubSignatureDrawEvent`, not `PointerEvent`
 
