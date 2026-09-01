@@ -97,6 +97,12 @@ export class HubSignatureComponent extends HubFieldControl {
 	/** Emits the canonical SVG after a user-originated change. */
 	readonly valueChange = output<string>();
 
+	/** Emits when the user starts a stroke, before any point is committed. */
+	readonly drawStart = output<PointerEvent>();
+
+	/** Emits when the user lifts the pointer and the stroke has been committed. */
+	readonly drawEnd = output<PointerEvent>();
+
 	constructor() {
 		super();
 		effect((onCleanup) => {
@@ -150,6 +156,7 @@ export class HubSignatureComponent extends HubFieldControl {
 		const point = this.getPoint(event);
 		this.drawingStroke.set({ points: [point], color: this.strokeColor(), width: this.strokeWidth() });
 		this.redraw();
+		this.drawStart.emit(event);
 	}
 
 	/** Extends the active stroke and paints an immediate visual preview. */
@@ -173,6 +180,7 @@ export class HubSignatureComponent extends HubFieldControl {
 		this.strokes.update((strokes) => [...strokes, stroke]);
 		this.redoStrokes.set([]);
 		this.notifyValueChange();
+		this.drawEnd.emit(event);
 	}
 
 	/** Removes every stroke and propagates the empty form value. */
@@ -204,6 +212,50 @@ export class HubSignatureComponent extends HubFieldControl {
 		this.strokes.update((strokes) => [...strokes, stroke]);
 		this.redraw();
 		this.notifyValueChange();
+	}
+
+	/**
+	 * Reports whether the field holds no signature, so a form can validate it
+	 * without parsing the serialized value.
+	 *
+	 * @returns Whether no stroke has been committed.
+	 */
+	isEmpty(): boolean {
+		return this.strokes().length === 0;
+	}
+
+	/**
+	 * Returns the committed strokes as structured data.
+	 *
+	 * Prefer {@link toSvg} to persist a signature: it is the canonical form value
+	 * and survives a change of internal representation. This exists for callers
+	 * that need the geometry itself — replaying a signature, or migrating from a
+	 * library that stored point groups.
+	 *
+	 * Deliberately NOT named `toData`, which is what angular2-signaturepad calls
+	 * its equivalent: that one returns `Array<Array<{x, y, time}>>` while this
+	 * returns `{points: [{x, y, pressure}], color, width}[]`. Reusing the name
+	 * would let a migration compile and fail silently wherever the value is
+	 * typed `any`.
+	 *
+	 * @returns A copy of the committed strokes.
+	 */
+	toStrokes(): HubSignatureStroke[] {
+		return this.strokes().map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) }));
+	}
+
+	/**
+	 * Replaces the signature with structured stroke data.
+	 *
+	 * Treated as a programmatic write, like {@link writeValue}: it repaints and
+	 * clears the redo stack but never reports a user change to Angular forms.
+	 *
+	 * @param strokes Strokes to draw.
+	 */
+	fromStrokes(strokes: readonly HubSignatureStroke[]): void {
+		this.strokes.set(strokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) })));
+		this.redoStrokes.set([]);
+		this.redraw();
 	}
 
 	/** Returns a lossless, scalable serialization suitable for form persistence. */

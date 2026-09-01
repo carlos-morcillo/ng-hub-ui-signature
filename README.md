@@ -23,6 +23,40 @@ export class ContractFormComponent {}
 
 The form control value is an SVG string. Use `toDataUrl('image/png')` for bitmap export, or `clear()`, `undo()` and `redo()` to control the field programmatically.
 
+## Asking what the field holds
+
+`toSvg()` is the form value, and for a long time it was also the only way to ask anything about the
+field: whether it had been signed at all meant parsing the string for a path. Three additions answer
+that directly.
+
+```ts
+@ViewChild(HubSignatureComponent) signature!: HubSignatureComponent;
+
+// Validate without parsing the serialized value.
+const signed = !this.signature.isEmpty();
+
+// The geometry itself, which the SVG form value does not carry.
+const strokes = this.signature.toStrokes(); // HubSignatureStroke[]
+this.other.fromStrokes(strokes);            // repaints; reports no user change to Angular forms
+```
+
+`toStrokes()` / `fromStrokes()` are deliberately **not** named `toData` / `fromData`, the names
+`angular2-signaturepad` uses. That library's `toData()` returns `Array<Array<{x, y, time}>>` and this
+one returns `{ points: [{ x, y, pressure }], color, width }[]`. The same name with an incompatible
+payload would let a migration compile and then fail silently wherever the value is typed `any`.
+
+## Reacting while the user draws
+
+| Output | Payload | Emitted |
+| --- | --- | --- |
+| `valueChange` | `string` | After a user-originated change, carrying the SVG |
+| `drawStart` | `PointerEvent` | When a stroke begins |
+| `drawEnd` | `PointerEvent` | When a stroke is finished and committed |
+
+`drawStart` and `drawEnd` let a host react to drawing activity — pausing an autosave, arming a submit
+button — without polling the value. They fire for user drawing only, so a programmatic write never
+looks like one.
+
 ## Localized actions
 
 The component is translation-framework agnostic. Configure the shared Hub UI adapter once at application bootstrap; it supplies one dictionary to every compatible Hub UI library, including Signature. Use `labels` only for a one-field exception:

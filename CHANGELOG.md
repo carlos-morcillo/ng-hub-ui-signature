@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [22.2.0] - 2026-09-01
+
+### Added
+
+- **`isEmpty()`**, so a form can validate the field without parsing the serialized value. Previously the only way to know whether anything had been drawn was to inspect the SVG string.
+- **`toStrokes()` / `fromStrokes()`**, exposing the committed strokes as structured `HubSignatureStroke[]`. `toSvg()` remains the canonical form value — this is for callers that need the geometry itself, such as replaying a signature or migrating from a library that stored point groups. `fromStrokes()` is a programmatic write: like `writeValue()`, it repaints without reporting a user change to Angular forms.
+
+  They are deliberately not called `toData` / `fromData`, the names angular2-signaturepad uses: that library's `toData()` returns `Array<Array<{x, y, time}>>` and this one returns `{points: [{x, y, pressure}], color, width}[]`. Same name with an incompatible payload would let a migration compile and then fail silently wherever the value is typed `any`.
+- **`(drawStart)` and `(drawEnd)` outputs**, emitted around a user stroke. They fill the gap left by libraries that exposed `onBeginEvent` / `onEndEvent`, and let a host react to drawing activity — enabling a submit button, pausing an autosave — without polling the value.
 
 ### Changed
 

@@ -1,6 +1,6 @@
 {
 	"name": "ng-hub-ui-signature",
-	"version": "22.1.1",
+	"version": "22.2.0",
 	"license": "MIT",
 	"description": "Accessible SVG-backed signature field for Angular forms, part of the ng-hub-ui family.",
 	"author": "Carlos Morcillo <carlos.morcillo@me.com> (https://www.carlosmorcillo.com)",
@@ -20,7 +20,23 @@
 		"cva",
 		"svg",
 		"ng-hub-ui",
-		"standalone"
+		"standalone",
+		"signature-pad",
+		"signaturepad",
+		"esign",
+		"e-signature",
+		"digital-signature",
+		"handwriting",
+		"draw",
+		"touch",
+		"pen",
+		"stylus",
+		"consent",
+		"contract",
+		"signature-capture",
+		"component",
+		"reusable",
+		"ui-library"
 	],
 	"peerDependencies": {
 		"@angular/common": ">=21.0.0",

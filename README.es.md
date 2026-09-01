@@ -25,6 +25,41 @@ export class ContractFormComponent {}
 
 El valor del control es un string SVG. Usa `toDataUrl('image/png')` para exportación bitmap, o `clear()`, `undo()` y `redo()` para controlar el campo mediante código.
 
+## Preguntar qué contiene el campo
+
+`toSvg()` es el valor del formulario y, durante mucho tiempo, también la única forma de preguntar
+cualquier cosa sobre el campo: saber si estaba firmado obligaba a buscar un trazo dentro de la
+cadena. Tres añadidos responden a eso directamente.
+
+```ts
+@ViewChild(HubSignatureComponent) signature!: HubSignatureComponent;
+
+// Validar sin analizar el valor serializado.
+const signed = !this.signature.isEmpty();
+
+// La geometría en sí, que el valor SVG no transporta.
+const strokes = this.signature.toStrokes(); // HubSignatureStroke[]
+this.other.fromStrokes(strokes);            // repinta; no notifica cambio de usuario a Angular forms
+```
+
+`toStrokes()` / `fromStrokes()` **no** se llaman `toData` / `fromData`, los nombres que usa
+`angular2-signaturepad`, y es deliberado: el `toData()` de esa biblioteca devuelve
+`Array<Array<{x, y, time}>>` y este devuelve `{ points: [{ x, y, pressure }], color, width }[]`. El
+mismo nombre con una carga incompatible dejaría compilar una migración para que fallara en silencio
+allí donde el valor esté tipado como `any`.
+
+## Reaccionar mientras se dibuja
+
+| Salida | Carga | Se emite |
+| --- | --- | --- |
+| `valueChange` | `string` | Tras un cambio del usuario, con el SVG |
+| `drawStart` | `PointerEvent` | Al empezar un trazo |
+| `drawEnd` | `PointerEvent` | Al terminar y consolidar un trazo |
+
+`drawStart` y `drawEnd` permiten al anfitrión reaccionar a la actividad de dibujo —pausar un
+autoguardado, armar un botón de envío— sin sondear el valor. Solo se emiten para el dibujo del
+usuario, así que una escritura por código nunca parece una.
+
 ## Acciones traducibles
 
 El componente no depende de ningún sistema de traducción. Configura una vez el adaptador compartido de Hub UI durante el arranque; entrega el mismo diccionario a todas las bibliotecas compatibles, incluida Signature. Usa `labels` solo para una excepción de un campo:
