@@ -10,7 +10,7 @@ This table details the functionalities of the `ng-hub-ui-signature` library and 
 |                       | Keyboard input (arrows carry the pen, Space/Enter, Escape)     |       [x]       |
 |                       | Escape discards the stroke in progress                         |       [x]       |
 |                       | `pointercancel` discards it too — not demoable in a page       |       [ ]       |
-|                       | Pressure-aware stroke width                                    |       [ ]       |
+|                       | ~~Pressure-aware stroke width~~ — not supported, see below     |       n/a       |
 |                       | `readonly` — preserves the signature, refuses new strokes      |       [x]       |
 |                       | `height`, `strokeColor`, `strokeWidth`                         |       [ ]       |
 |                       | `currentColor` resolved against the surface before capture     |       [ ]       |
@@ -43,12 +43,20 @@ This table details the functionalities of the `ng-hub-ui-signature` library and 
 |                       | `ariaLabel` — the translated accessible name                   |       [ ]       |
 | **Theming**           | The eleven `--hub-signature-*` slots                           |       [x]       |
 |                       | `hub-signature-theme()` mixin                                  |       [x]       |
-|                       | Inherits the `ng-hub-ui-forms` token family                    |       [ ]       |
+|                       | Inherits the `ng-hub-ui-forms` token family                    |       [x]       |
 
-Examples live in the documentation site under `src/app/pages/examples/signature/`. Six of them:
-basic, keyboard signing, reactive form, draw events, external translations and theming.
+Examples live in the documentation site under `src/app/pages/examples/signature/`. Seven of them:
+basic, keyboard signing, reactive form, draw events, external translations, the theming mixin, and
+the field inheriting a themed form.
 
-The gap worth naming: **no example shows the field inheriting a themed form**, which is the path
-most consumers will actually take — theming `--hub-input-*` and `--hub-label-*` once and letting
-the signature follow. The theming demo overrides the `--hub-signature-*` slots directly, which is
-the exception rather than the rule.
+**Pressure is captured and then discarded.** `getPoint()` reads `PointerEvent.pressure` onto every
+point, and nothing ever reads it back: `redraw()` paints with the constant `stroke.width`,
+`serializeHubSignature()` emits only `M`/`L` coordinates, and `parseHubSignature()` hardcodes `0.5`
+on the way in. So pressure never reaches the form value, never survives a round trip and never
+affects a pixel — it is visible only through `toStrokes()`, and only for strokes drawn in that same
+session. The row above used to claim "pressure-aware stroke width" as an uncovered functionality;
+it is not uncovered, it does not exist. Variable stroke width would be a feature, not an example.
+
+The examples cover the paths a consumer takes, not every input: `height` / `strokeWidth`,
+`classlist`, `toDataUrl()`, `(valueChange)` and the per-field `labels` override are exercised only
+in the API tables.
