@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { KeyValuePipe } from '@angular/common';
+import { HubTooltipDirective } from 'ng-hub-ui-utils';
 import { HubLabelType, HubLabelTypes } from 'ng-hub-ui-forms';
 import { HubFieldControl } from 'ng-hub-ui-forms';
 import { HubTranslationService } from 'ng-hub-ui-utils';
@@ -61,7 +62,7 @@ function clamp(value: number, min: number, max: number): number {
 @Component({
 	selector: 'hub-signature',
 	standalone: true,
-	imports: [KeyValuePipe],
+	imports: [KeyValuePipe, HubTooltipDirective],
 	changeDetection: ChangeDetectionStrategy.OnPush,
 	encapsulation: ViewEncapsulation.None,
 	templateUrl: './signature.component.html',
@@ -116,9 +117,6 @@ export class HubSignatureComponent extends HubFieldControl {
 	 * on top of the ink the moment anyone signed.
 	 */
 	readonly labelType = input<HubLabelType>(this._labelTypes.Stacked);
-
-	/** Helper text rendered below the field. */
-	readonly formText = input<string>('');
 
 	/** Logical drawing height in CSS pixels. */
 	readonly height = input(160, { transform: numberAttribute });

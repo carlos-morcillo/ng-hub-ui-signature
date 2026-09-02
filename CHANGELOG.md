@@ -1,5 +1,26 @@
 # Changelog
 
+## [22.6.0] - 2026-09-02
+
+### Added
+
+- **`formTextType="tooltip"` works here too.** `ng-hub-ui-forms` 22.31.0 moved `formText` and
+  `formTextType` onto `HubFieldControl`, the base class this component extends, so the input
+  arrived here for free — and did nothing, because the template rendered the helper block
+  unconditionally and drew no question mark. The compiler accepted `formTextType="tooltip"` on a
+  `<hub-signature>` and the page ignored it, which is the worst shape a gap can take.
+
+  The mark now sits in a `.hub-field__label-row` beside the label rather than inside it. That is
+  not decoration: clicking this label focuses the drawing surface, so a button nested in it would
+  open the tooltip and put the pen in the reader's hand at once.
+
+### Fixed
+
+- **The component compiles against `ng-hub-ui-forms` 22.31.0.** It declared its own `formText`,
+  which the base class now declares too, and TypeScript refuses the redeclaration without an
+  `override` modifier (TS4114). The local declaration is deleted rather than annotated — the base
+  one is identical, and two declarations of one input is how they drift.
+
 ## [22.5.0] - 2026-09-01
 
 ### Fixed
