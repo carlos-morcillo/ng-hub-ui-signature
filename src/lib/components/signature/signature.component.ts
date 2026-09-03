@@ -10,12 +10,13 @@ import {
 	input,
 	numberAttribute,
 	output,
+	PLATFORM_ID,
 	signal,
 	viewChild,
 	ViewEncapsulation
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { KeyValuePipe } from '@angular/common';
+import { isPlatformBrowser, KeyValuePipe } from '@angular/common';
 import { HubTooltipDirective } from 'ng-hub-ui-utils';
 import { HubLabelType, HubLabelTypes } from 'ng-hub-ui-forms';
 import { HubFieldControl } from 'ng-hub-ui-forms';
@@ -71,6 +72,7 @@ function clamp(value: number, min: number, max: number): number {
 })
 export class HubSignatureComponent extends HubFieldControl {
 	protected readonly _labelTypes = HubLabelTypes;
+	private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 	private readonly config = inject(HUB_SIGNATURE_CONFIG);
 	private readonly translationSvc = inject(HubTranslationService, { optional: true });
 	private readonly translationSnapshot = this.translationSvc
@@ -518,8 +520,17 @@ export class HubSignatureComponent extends HubFieldControl {
 		};
 	}
 
-	/** Replays retained geometry so rendering is independent from interaction history. */
+	/**
+	 * Replays retained geometry so rendering is independent from interaction history.
+	 *
+	 * Painting is skipped outside the browser. `writeValue()` calls this whenever a form binds a
+	 * value, which happens during server-side rendering, and the server DOM shim *throws* from
+	 * `getContext` rather than returning null — so the null check below never gets the chance to
+	 * run. Nothing is lost by skipping: the canvas has no pixels on the server, and
+	 * `afterNextRender` repaints as soon as it does.
+	 */
 	private redraw(): void {
+		if (!this.isBrowser) return;
 		const canvas = this.canvas()?.nativeElement;
 		const context = canvas?.getContext('2d');
 		if (!canvas || !context) return;

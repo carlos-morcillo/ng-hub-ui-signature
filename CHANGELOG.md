@@ -1,5 +1,18 @@
 # Changelog
 
+## [22.6.1] - 2026-09-03
+
+### Fixed
+
+- **Server-side rendering no longer throws.** `writeValue()` repaints the canvas, and it runs
+  whenever a reactive form binds a value — including during prerendering, where the server DOM
+  shim *throws* `NotYetImplemented` from `canvas.getContext('2d')` instead of returning null, so
+  the existing null check never got the chance to run. Measured on the documentation site, this
+  produced 16 errors per full prerender. `redraw()` now returns early outside the browser.
+
+    Nothing is lost by skipping it: the canvas has no pixels on the server, and the existing
+  `afterNextRender` hook already repaints as soon as it does. No API, type or style changes.
+
 ## [22.6.0] - 2026-09-02
 
 ### Added
